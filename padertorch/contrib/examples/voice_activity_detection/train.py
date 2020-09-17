@@ -72,8 +72,7 @@ def select_speech(example):
     return example
 
 
-def prepare_dataset(dataset, audio_segmentation, shuffle=False):
-    batch_size = 8#24
+def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8):
     db = Fearless()
 
     def prepare_example(example):

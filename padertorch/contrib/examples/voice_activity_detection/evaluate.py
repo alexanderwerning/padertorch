@@ -52,7 +52,7 @@ def get_model_output(ex, model):
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    dataset = prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio)
+    dataset = prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         predictions.extend(model_out_org)
