@@ -37,14 +37,6 @@ def get_datasets():
     train = db.get_dataset_train(subset='stream')
     validate = db.get_dataset_validation(subset='stream')
 
-    def prepare_example(example):
-        example['audio_path'] = example['audio_path']['observation']
-        example['activity'] = db.get_activity(example)
-        return example
-
-    train = train.map(prepare_example)
-    validate = validate.map(prepare_example)
-
     training_data = prepare_dataset(train, chunker, shuffle=True)
     validation_data = prepare_dataset(validate, select_speech, shuffle=False)
     return training_data, validation_data
@@ -82,6 +74,14 @@ def select_speech(example):
 
 def prepare_dataset(dataset, audio_segmentation, shuffle=False):
     batch_size = 8#24
+    db = Fearless()
+
+    def prepare_example(example):
+        example['audio_path'] = example['audio_path']['observation']
+        example['activity'] = db.get_activity(example)
+        return example
+
+    dataset.map(prepare_example)
 
     if shuffle:
         dataset = dataset.shuffle(reshuffle=True)
