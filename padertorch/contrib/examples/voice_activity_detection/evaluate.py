@@ -31,7 +31,7 @@ def config():
 
 
 def partition_audio(ex):
-    segment_length = 400
+    segment_length = 8000 * 60
     num_samples = ex['num_samples']
     index = ex['index']
     start = max(index * segment_length - 8000, 0)
@@ -64,12 +64,13 @@ def get_model_output(ex, model):
     return list(zip(predictions, sequence_lengths))
 
 
-def get_binary_classification(model_out, threshold, ex):
+def get_binary_classification(model_out, threshold):
     segment_length = 8000 * 60
-    num_samples = ex['num_samples']
+    num_samples = model_out[1]
+    model_prediction = model_out[0]
     vad = list()
     for index in range(math.ceil(num_samples / segment_length)):
-        model_out_org, segments = model_out[index]
+        model_out_org, segments = model_prediction[index]
         binarized_prediction = model_out_org > threshold
         vad_out = np.repeat(binarized_prediction, 80)
         # remove buffer
@@ -100,7 +101,7 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset(dataset),
             lambda ex: get_model_output(ex, model),
-            lambda out, th: get_binary_classification(out, th, ex),
+            lambda out, th: get_binary_classification(out, th),
             get_target_fn, num_thresholds=num_ths
         )
 
