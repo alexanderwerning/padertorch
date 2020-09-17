@@ -28,10 +28,10 @@ def config():
 
 def partition_audio(ex):
     segment_length = 8000 * 60
-    STFT_LENGTH = 400
+    STFT_SHIFT = 80
     num_samples = ex['num_samples']
     index = ex['index']
-    start = max(index * segment_length-2*STFT_LENGTH, 0)
+    start = max(index * segment_length-2*STFT_SHIFT, 0)
     stop = min((index+1) * segment_length, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
