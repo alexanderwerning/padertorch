@@ -31,15 +31,14 @@ def partition_audio(ex):
     STFT_SHIFT = 80
     num_samples = ex['num_samples']
     index = ex['index']
-    start = max(index * segment_length-4*STFT_SHIFT, 0)
-    stop = min((index+1) * segment_length, num_samples)
+    start = max(index * segment_length-2*STFT_SHIFT, 0)
+    stop = min((index+1) * segment_length+2*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
 
-# divide audio of ex into 61s snippets and use segments long stft # the first 1s is buffer
 def get_model_output(ex, model):
     segment_length = 8000 * 60
     num_samples = ex['num_samples']
@@ -87,14 +86,16 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
                                  shift=80,
                                  end='pad'
                                  ).any(axis=-1)
-        return  per_frame# ground truth
+        return per_frame  # ground truth
 
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset(dataset),
             lambda ex: get_model_output(ex, model),
             lambda out, th: get_binary_classification(out, th),
-            get_target_fn, num_thresholds=num_ths
+            get_target_fn,
+            num_thresholds=num_ths,
+            buffer_zone=0
         )
 
     if out_dir is None:
