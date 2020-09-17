@@ -97,13 +97,13 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
             num_thresholds=num_ths,
             buffer_zone=0
         )
-
-    if out_dir is None:
-        out_dir = model_dir
-    else:
-        out_dir = Path(out_dir).expanduser().resolve()
-    (out_dir / f'tp_fp_tn_fn_fearless_{buffer}.txt').write_text(
-        '\n'.join([
-            ' '.join([str(v) for v in value]) for value in
-            tp_fp_tn_fn.tolist()
-        ]))
+    if dlp_mpi.IS_MASTER:
+        if out_dir is None:
+            out_dir = model_dir
+        else:
+            out_dir = Path(out_dir).expanduser().resolve()
+        (out_dir / f'tp_fp_tn_fn_fearless_{buffer}.txt').write_text(
+            '\n'.join([
+                ' '.join([str(v) for v in value]) for value in
+                tp_fp_tn_fn.tolist()
+            ]))
