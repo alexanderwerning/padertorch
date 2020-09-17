@@ -50,74 +50,52 @@ def get_datasets():
     train = train.map(prepare_example)
     validate = validate.map(prepare_example)
 
-    training_data = prepare_dataset(train, training=True)
-    validation_data = prepare_dataset(validate, training=False)
+    training_data = prepare_dataset(train, chunker, shuffle=True)
+    validation_data = prepare_dataset(validate, select_speech, shuffle=False)
     return training_data, validation_data
 
 
-def prepare_dataset(dataset, training=False):
+def chunker(example):
+    """Split stream into 4s segments."""
+    # 4s at 8kHz -> 32k samples
+    chunk_length = 32000
+    start = max(0, np.random.randint(example['num_samples'])-chunk_length)
+    stop = start + chunk_length
+    example.update(num_samples=chunk_length)
+    example.update(audio_start_samples=start)
+    example.update(audio_stop_samples=stop)
+    example.update(audio_path=example['audio_path'])
+    example.update(activity=example['activity'][start:stop])
+    return example
+
+
+def select_speech(example):
+    """Cut out a section with speech for evaluation.
+
+    We evaluate the model on 30s audio segments which contain speech."""
+    first_speech = example['activity'].intervals[0][0]
+    max_time_buffer = 8000 * 15 # 15s
+    time_buffer = np.random.randint(max_time_buffer)
+    length = 8000 * 30 # 30s
+    start = max(0, first_speech-time_buffer)
+    stop = start + length
+    example['audio_start_samples'] = start
+    example['audio_stop_samples'] = stop
+    example['activity'] = example['activity'][start:stop]
+    return example
+
+
+def prepare_dataset(dataset, audio_segmentation, shuffle=False):
     batch_size = 8#24
 
-    def chunker(example):
-        """Split stream into 4s segments"""
-        # 4s at 8kHz -> 32k samples
-        chunk_length = 32000
-        # chunk_count = int(example['num_samples']/chunk_length)
-        # if DEBUG:
-        #     chunk_count = min(chunk_count, 20)
-        # chunks = []
-        # for chunk_id in range(chunk_count):
-        #     chunk = {'example_id': example['example_id']+'_'+str(chunk_id)}
-        #     num_samples = chunk_length
-
-        #     if chunk_id == chunk_count - 1:
-        #         num_samples = example['num_samples'] - (chunk_count-1) * chunk_length
-
-        #     start = chunk_id*chunk_length
-        #     end = start + num_samples
-        #     chunk.update(num_samples=num_samples)
-        #     chunk.update(audio_start_samples=start)
-        #     chunk.update(audio_stop_samples=end)
-        #     chunk.update(audio_path=example['audio_path'])
-        #     chunk.update(activity=example['activity'][start:end])
-        #     chunks.append(chunk)
-        #     np.random.shuffle(chunks)
-        # return chunks
-        start = max(0, np.random.randint(example['num_samples'])-chunk_length)
-        stop = start + chunk_length
-        example.update(num_samples=chunk_length)
-        example.update(audio_start_samples=start)
-        example.update(audio_stop_samples=stop)
-        example.update(audio_path=example['audio_path'])
-        example.update(activity=example['activity'][start:stop])
-        return example
-
-    def select_speech(example):
-        """Cut out a section with speech for evaluation.
-
-        We evaluate the model on 30s audio segments which contain speech."""
-        first_speech = example['activity'].intervals[0][0]
-        max_time_buffer = 8000 * 15 # 15s
-        time_buffer = np.random.randint(max_time_buffer)
-        length = 8000 * 30 # 30s
-        start = max(0, first_speech-time_buffer)
-        stop = start + length
-        example['audio_start_samples'] = start
-        example['audio_stop_samples'] = stop
-        example['activity'] = example['activity'][start:stop]
-        return example
-
-    if training:
+    if shuffle:
         dataset = dataset.shuffle(reshuffle=True)
 
     dataset = dataset.prefetch(
         num_workers=8, buffer_size=10*batch_size
     )
 
-    if training:
-        dataset = dataset.map(chunker)
-    else:
-        dataset = dataset.map(select_speech)
+    dataset = dataset.map(audio_segmentation)
 
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
@@ -134,18 +112,8 @@ def prepare_dataset(dataset, training=False):
         size=STFT_SIZE,
         window_length=STFT_WINDOW_LENGTH,
         pad=STFT_PAD,
-        fading='half'# was None
+        fading=None
     )
-
-    def segment(array):
-        frames = int(array.shape[0]/STFT_SHIFT)
-        output = np.zeros(frames)
-        for i in range(frames):
-            middle = i*STFT_SHIFT
-            start = max(0, middle-STFT_WINDOW_LENGTH)
-            stop = min(middle+STFT_WINDOW_LENGTH, array.shape[0]-1)
-            output[i] = array[start: stop].any()
-        return output
 
     def calculate_stft(example):
         complex_spectrum = stft(example['audio_data'].flatten())
@@ -154,12 +122,11 @@ def prepare_dataset(dataset, training=False):
         real_magnitude = real_magnitude[None, None, ...]
         example['features'] = rearrange(real_magnitude,
                                         'b c f t -> b c t f', b=1, c=1)[:, :, :-1, :]
-        example['activity'] = segment(example['activity'])
-        # example['activity'] = segment_axis(example['activity'],
-        #                                    length=STFT_WINDOW_LENGTH,
-        #                                    shift=STFT_SHIFT,
-        #                                    end='pad' if STFT_PAD else 'cut'
-        #                                    ).any(axis=-1)
+        example['activity'] = segment_axis(example['activity'],
+                                           length=STFT_WINDOW_LENGTH,
+                                           shift=STFT_SHIFT,
+                                           end='pad' if STFT_PAD else 'cut'
+                                           ).any(axis=-1)
         return example
 
     dataset = dataset.map(calculate_stft)
