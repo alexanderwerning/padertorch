@@ -97,7 +97,7 @@ def evaluate_model(dataset, model, get_sad_fn, get_target_fn=lambda x: x['activa
     tp_fp_tn_fn = np.zeros((num_thresholds, 4), dtype=int)
     for example in dlp_mpi.split_managed(
         dataset, is_indexable=is_indexable,
-        allow_single_worker=False,
+        allow_single_worker=True,
     ):
         target = get_target_fn(example)
         adjusted_target = adjust_annotation_fn(
