@@ -72,7 +72,7 @@ def get_binary_classification(model_out, threshold):
         
         offset = 0 if start == 0 else 8000
         end = start + segment_length
-        vad.append(vad_out[offset:end])
+        vad.append(vad_out)
         start += segment_length
     return np.concatenate(vad, axis=-1)
 
