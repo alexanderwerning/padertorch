@@ -94,7 +94,7 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
     model.eval()
 
     def get_target_fn(ex):
-        return Fearless.get_activity(ex)[:]  # ground truth
+        return db.get_activity(ex)[:]  # ground truth
 
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
