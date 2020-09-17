@@ -38,25 +38,31 @@ class SAD_Classifier(Model):
     def review(self, inputs, outputs):
         activity = inputs['activity']
         bce = torch.nn.BCELoss(reduction='none')(outputs, activity)
-        not_active = 1-activity
-        not_active_sum = not_active.sum()
+        scalar_names = [
+            'true_pos_{thres}',
+            'false_pos_{thres}',
+            'true_neg_{thres}',
+            'false_neg_{thres}'
+        ]
+        results = {}
+        for thres in [0.3, 0.5]:
+            binarized = outputs > thres
+            for key in [name.format(thres=thres) for name in scalar_names]:
+                true = binarized == activity
+                false = ~true
+                tp = np.sum(np.bitwise_and(true, activity))
+                fp = np.sum(np.bitwise_and(false, activity))
+                tn = np.sum(np.bitwise_and(true, ~activity))
+                fn = np.sum(np.bitwise_and(false, ~activity))
+                results[key] = (tp, fp, tn, fn)
 
-        predictions = torch.round(outputs)
-        precision = (not_active * predictions).sum()/not_active_sum if not_active_sum > 0 else 1
-        active_sum = activity.sum()
-
-        recall = (activity * predictions).sum()/active_sum if active_sum > 0 else 1
         summary = dict(
             loss=bce.mean(),
-            scalars=dict(
-                precision=precision,
-                accuracy=accuracy,
-                recall=recall
-            )
+            scalars=results
         )
         return summary
 
-        def modify_summary(self, summary):
+    def modify_summary(self, summary):
         summary = super().modify_summary(summary)
         # compute precision, recall and fscore for each decision threshold
         scalar_names = [
