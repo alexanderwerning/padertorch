@@ -86,7 +86,7 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
                                  shift=80,
                                  end='pad'
                                  ).any(axis=-1)
-        return   # ground truth
+        return  per_frame# ground truth
 
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
