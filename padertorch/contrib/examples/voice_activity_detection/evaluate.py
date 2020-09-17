@@ -25,10 +25,9 @@ def config():
     num_ths = 201
     buffer = 0.5
     ckpt = 'ckpt_latest.pth'
-    dataset = 'Eval_stream'
+    dataset = 'Dev_stream'
     ignore_buffer = False
     norm = False
-    dataset = 'Dev'
 
 
 def partition_audio(ex, segment_length):
