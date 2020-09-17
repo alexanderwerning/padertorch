@@ -12,6 +12,7 @@ from padertorch.contrib.jensheit.batch import Padder
 from padercontrib.database.fearless import Fearless
 from padertorch.contrib.examples.voice_activity_detection.model import SAD_Classifier
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
+from padertorch.contrib.examples.voice_activity_detection.train import get_model
 from padertorch.contrib.jensheit.eval_sad import evaluate_model
 
 ex = sacred.Experiment('VAD Evaluation')
@@ -19,8 +20,8 @@ ex = sacred.Experiment('VAD Evaluation')
 
 @ex.config
 def config():
-    model_dir = '/net/vol/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
-    out_dir = None
+    model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
+    out_dir = '/home/awerning/out'
     num_ths = 201
     buffer = 0.5
     ckpt = 'ckpt_latest.pth'
@@ -87,16 +88,10 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
 
-    model_cls = SAD_Classifier
-    model = model_cls.from_config_and_checkpoint(
-        config_path=model_dir / 'init.json',
-        checkpoint_path=model_dir / 'checkpoints' / ckpt,
-        in_config_path='trainer_opts.model',
-        in_checkpoint_path='model',
-    )
-    provider_opts = pb.io.load_json(model_dir / 'init.json')['provider_opts']
+    model = get_model()
+    state_dict = torch.load(Path(model_dir/'ckpt_latest.pth'))['model']
+    model.load_state_dict(state_dict)
     db = Fearless()
-    model.train()
     model.eval()
 
     def get_target_fn(ex):
