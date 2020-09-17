@@ -5,7 +5,7 @@ import numpy as np
 import sacred
 import torch
 import lazy_dataset
-from padertorch.contrib.jensheit.batch import Padder 
+from paderbox.array import segment_axis
 from padercontrib.database.fearless import Fearless
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model
@@ -30,8 +30,8 @@ def partition_audio(ex):
     segment_length = 8000 * 60
     num_samples = ex['num_samples']
     index = ex['index']
-    start = max(index * segment_length - 8000, 0)
-    stop = min(start + segment_length + 8000, num_samples)
+    start = max(index * segment_length, 0)
+    stop = min(start + segment_length, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
@@ -62,18 +62,9 @@ def get_model_output(ex, model):
 
 def get_binary_classification(model_out, threshold):
     vad = list()
-    start = 0
     for prediction, seq_len in model_out:
-        
         binarized_prediction = prediction > threshold
-        vad_out = np.repeat(binarized_prediction, 80)
-        segment_length = seq_len*80
-        # remove buffer
-        
-        offset = 0 if start == 0 else 8000
-        end = start + segment_length
-        vad.append(vad_out)
-        start += segment_length
+        vad.append(binarized_prediction)
     return np.concatenate(vad, axis=-1)
 
 
@@ -89,7 +80,13 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
     model.eval()
 
     def get_target_fn(ex):
-        return db.get_activity(ex)[:]  # ground truth
+        per_sample = db.get_activity(ex)[:]
+        per_frame = segment_axis(per_sample,
+                                 length=400,
+                                 shift=80,
+                                 end='pad'
+                                 ).any(axis=-1)
+        return   # ground truth
 
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
