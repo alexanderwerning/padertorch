@@ -81,7 +81,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False):
         example['activity'] = db.get_activity(example)
         return example
 
-    dataset.map(prepare_example)
+    dataset = dataset.map(prepare_example)
 
     if shuffle:
         dataset = dataset.shuffle(reshuffle=True)
