@@ -1,16 +1,12 @@
 import math
 from pathlib import Path
 
-
-import jsonpickle
 import numpy as np
-import paderbox as pb
 import sacred
 import torch
 import lazy_dataset
-from padertorch.contrib.jensheit.batch import Padder
+from padertorch.contrib.jensheit.batch import Padder 
 from padercontrib.database.fearless import Fearless
-from padertorch.contrib.examples.voice_activity_detection.model import SAD_Classifier
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model
 from padertorch.contrib.jensheit.eval_sad import evaluate_model
