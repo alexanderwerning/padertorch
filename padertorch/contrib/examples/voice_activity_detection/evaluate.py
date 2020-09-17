@@ -64,8 +64,7 @@ def get_model_output(ex, model):
     return list(zip(predictions, sequence_lengths))
 
 
-def get_binary_classification(model_out, threshold, ex,
-                              model):
+def get_binary_classification(model_out, threshold, ex):
     segment_length = 8000 * 60
     num_samples = ex['num_samples']
     vad = list()
@@ -101,7 +100,7 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset(dataset),
             lambda ex: get_model_output(ex, model),
-            lambda out, th, ex: get_binary_classification(out, th, ex, model),
+            lambda out, th: get_binary_classification(out, th, ex),
             get_target_fn, num_thresholds=num_ths
         )
 
