@@ -62,18 +62,20 @@ def get_model_output(ex, model):
 
 def get_binary_classification(model_out, threshold):
     vad = list()
+    start = 0
     for prediction, seq_len in model_out:
         
         binarized_prediction = prediction > threshold
         vad_out = np.repeat(binarized_prediction, 80)
         segment_length = seq_len*80
         # remove buffer
-        start = index * segment_length
+        
         offset = 0 if start == 0 else 8000
-        end = start + seqsegment_length_len
+        end = start + segment_length
         end = end if end <= num_samples else num_samples
         end_vad = segment_length if end < num_samples else num_samples - start
         vad.append(vad_out[offset:end_vad])
+        start += segment_length
     return np.concatenate(vad, axis=-1)
 
 
