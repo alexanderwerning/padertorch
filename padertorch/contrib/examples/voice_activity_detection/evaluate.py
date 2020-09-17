@@ -101,7 +101,7 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
             db.get_dataset(dataset),
             lambda ex: get_model_output(ex, model),
             lambda out, th, ex: get_binary_classification(out, th, ex, model),
-            get_target_fn, num_thresholds=num_ths
+            get_target_fn, num_thresholds=num_ths, allow_single_worker=True
         )
 
     if out_dir is None:
