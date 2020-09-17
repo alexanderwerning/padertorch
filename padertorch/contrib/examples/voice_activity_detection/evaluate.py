@@ -1,6 +1,7 @@
 import math
 from pathlib import Path
 
+import dlp_mpi
 import numpy as np
 import sacred
 import torch
