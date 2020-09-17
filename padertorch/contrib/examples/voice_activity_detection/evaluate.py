@@ -30,7 +30,8 @@ def config():
     norm = False
 
 
-def partition_audio(ex, segment_length):
+def partition_audio(ex):
+    segment_length = 400
     num_samples = ex['num_samples']
     index = ex['index']
     start = max(index * segment_length - 8000, 0)
