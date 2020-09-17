@@ -61,18 +61,16 @@ def get_model_output(ex, model):
 
 
 def get_binary_classification(model_out, threshold):
-    segment_length = 8000 * 60
-    num_samples = model_out[1]
-    model_prediction = model_out[0]
     vad = list()
-    for index in range(math.ceil(num_samples / segment_length)):
-        model_out_org, segments = model_prediction[index]
-        binarized_prediction = model_out_org > threshold
+    for prediction, seq_len in model_out:
+        
+        binarized_prediction = prediction > threshold
         vad_out = np.repeat(binarized_prediction, 80)
+        segment_length = seq_len*80
         # remove buffer
         start = index * segment_length
         offset = 0 if start == 0 else 8000
-        end = start + segment_length
+        end = start + seqsegment_length_len
         end = end if end <= num_samples else num_samples
         end_vad = segment_length if end < num_samples else num_samples - start
         vad.append(vad_out[offset:end_vad])
