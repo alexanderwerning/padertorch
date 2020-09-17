@@ -28,11 +28,6 @@ from torch.autograd import Variable
 from paderbox.array import segment_axis
 from einops import rearrange
 
-storage_dir = str(
-    Path(os.environ['STORAGE_ROOT']) / 'voice_activity' / timeStamped('')[1:]
-)
-os.makedirs(storage_dir, exist_ok=True)
-
 DEBUG = False
 DATA_TEST = False
 
@@ -187,10 +182,14 @@ def train(model):
 
 
 def main():
+    storage_dir = str(
+    Path(os.environ['STORAGE_ROOT']) / 'voice_activity' / timeStamped('')[1:]
+    )
+    os.makedirs(storage_dir, exist_ok=True)
     if DATA_TEST:
         train_set, validate_set = get_datasets()
         element = train_set.__iter__().__next__()
-        #element['activity'] = element['activity']
+        # element['activity'] = element['activity']
         model = get_model()
         print(element['features'].shape, element['activity'].shape)
         output = model.forward(element)
