@@ -42,7 +42,7 @@ def partition_audio(ex, segment_length):
 
 
 # divide audio of ex into 61s snippets and use segments long stft # the first 1s is buffer
-def get_model_output(ex, model, transform):
+def get_model_output(ex, model):
     segment_length = 8000 * 60
     num_samples = ex['num_samples']
 
