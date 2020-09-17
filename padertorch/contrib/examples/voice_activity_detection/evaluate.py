@@ -38,6 +38,7 @@ def partition_audio(ex):
     stop = min(start + segment_length + 8000, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
+    print(ex.keys())
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
