@@ -14,6 +14,11 @@ from padertorch.contrib.jensheit.eval_sad import evaluate_model
 
 ex = sacred.Experiment('VAD Evaluation')
 
+STFT_SHIFT = 80
+STFT_LENGTH = 400
+SEGMENT_LENGTH = 8000 * 60
+
+
 
 @ex.config
 def config():
@@ -22,32 +27,30 @@ def config():
     num_ths = 201
     buffer = 0.5
     ckpt = 'ckpt_latest.pth'
-    dataset = 'Dev_stream'
+    subset = 'stream'
     ignore_buffer = False
     norm = False
+    per_sample = True # determines whether evaluation works on samples or frames (determined by stft)
 
 
 def partition_audio(ex):
-    segment_length = 8000 * 60
-    STFT_SHIFT = 80
     num_samples = ex['num_samples']
     index = ex['index']
-    start = max(index * segment_length-2*STFT_SHIFT, 0)
-    stop = min((index+1) * segment_length+2*STFT_SHIFT, num_samples)
+    start = max(index * SEGMENT_LENGTH-2*STFT_SHIFT, 0)
+    stop = min((index+1) * SEGMENT_LENGTH+2*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
 
-def get_model_output(ex, model):
-    segment_length = 8000 * 60
+def get_model_output(ex, model, per_sample):
     num_samples = ex['num_samples']
 
     predictions = []
     sequence_lengths = []
     dict_dataset = {}
-    for index in range(math.ceil(num_samples / segment_length)):
+    for index in range(math.ceil(num_samples / SEGMENT_LENGTH)):
         sub_ex = ex.copy()
         sub_ex['index'] = index
         sub_ex_id = str(index)
@@ -56,7 +59,21 @@ def get_model_output(ex, model):
     dataset = prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        predictions.extend(model_out_org)
+        if per_sample:
+            #convolve with STFT_LENGTH/STFT_SHIFT box window #intuition: once one overlapping frame is active, a sample should be active
+            model_out_conv = np.convolve(model_out_org, np.ones(STFT_LENGTH / STFT_SHIFT))
+            # 4 = STFT_LENGTH/STFT_SHIFT -1
+            model_out_padded = np.zeros(model_out_conv.shape+STFT_LENGTH / STFT_SHIFT - 1)
+            model_out_padded[2:-2] = model_out_conv
+            model_out_padded[:2] = model_out_conv[0]
+            model_out_padded[-2:] = model_out_conv[-1]
+            # scale up by STFT_SHIFT
+            model_out_per_sample = np.repeat(model_out_padded, STFT_SHIFT)
+            model_out = model_out_per_sample
+        else:
+            model_out = model_out_org
+        
+        predictions.extend(model_out)
         sequence_lengths.extend(batch['seq_len'])
     return list(zip(predictions, sequence_lengths))
 
@@ -70,7 +87,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @ex.automain
-def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
+def main(model_dir, num_ths, buffer, ckpt, out_dir, subset, per_sample):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
 
@@ -80,21 +97,24 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, dataset):
     db = Fearless()
     model.eval()
 
-    def get_target_fn(ex):
-        per_sample = db.get_activity(ex)[:]
-        per_frame = segment_axis(per_sample,
-                                 length=400,
-                                 shift=80,
-                                 end='pad'
-                                 ).any(axis=-1)
-        return per_frame  # ground truth
+    def get_target_fn(ex, per_sample):
+        per_sample_vad = db.get_activity(ex)[:]
+        if per_sample:
+            return per_sample_vad
+        else:
+            per_frame_vad = segment_axis(per_sample,
+                                         length=400,
+                                         shift=80,
+                                         end='pad'
+                                         ).any(axis=-1)
+            return per_frame_vad
 
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
-            db.get_dataset(dataset),
-            lambda ex: get_model_output(ex, model),
+            db.get_dataset_validation(subset),
+            lambda ex: get_model_output(ex, model, per_sample),
             lambda out, th: get_binary_classification(out, th),
-            get_target_fn,
+            lambda ex: get_target_fn(ex, per_sample),
             num_thresholds=num_ths,
             buffer_zone=0
         )
