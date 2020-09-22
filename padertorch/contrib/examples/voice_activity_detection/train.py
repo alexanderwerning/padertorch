@@ -43,12 +43,12 @@ def get_datasets():
 
 
 def chunker(example):
-    """Split stream into 4s segments."""
+    """Cut out a random 4s segment from the stream for training."""
     # 4s at 8kHz -> 32k samples
-    chunk_length = 32000
+    chunk_length = 4 * 8000
     start = max(0, np.random.randint(example['num_samples'])-chunk_length)
-    stop = start + chunk_length
-    example.update(num_samples=chunk_length)
+    stop = min(start + chunk_length, example['num_samples'])
+    example.update(num_samples=stop-start)
     example.update(audio_start_samples=start)
     example.update(audio_stop_samples=stop)
     example.update(audio_path=example['audio_path'])
@@ -59,7 +59,8 @@ def chunker(example):
 def select_speech(example):
     """Cut out a section with speech for evaluation.
 
-    We evaluate the model on 30s audio segments which contain speech."""
+    We evaluate the model on 30s audio segments which contain speech.
+    """
     first_speech = example['activity'].intervals[0][0]
     max_time_buffer = 8000 * 15 # 15s
     time_buffer = np.random.randint(max_time_buffer)
@@ -111,11 +112,10 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8):
 
     def calculate_stft(example):
         complex_spectrum = stft(example['audio_data'].flatten())
-        spectrum_magnitude = np.abs(complex_spectrum)**2
-        real_magnitude = spectrum_magnitude.astype(np.float32)
-        real_magnitude = real_magnitude[None, None, ...]
-        example['features'] = rearrange(real_magnitude,
-                                        'b c f t -> b c t f', b=1, c=1)[:, :, :-1, :]
+        real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
+        features = rearrange(real_magnitude[None, None, ...],
+                             'b c f t -> b c t f', b=1, c=1)[:, :, :-1, :]
+        example['features'] = features
         example['activity'] = segment_axis(example['activity'],
                                            length=STFT_WINDOW_LENGTH,
                                            shift=STFT_SHIFT,
