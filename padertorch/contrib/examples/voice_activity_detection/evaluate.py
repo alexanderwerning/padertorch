@@ -20,7 +20,6 @@ SEGMENT_LENGTH = 8000 * 60
 TRAINED_MODEL = False
 
 
-
 @ex.config
 def config():
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
@@ -31,7 +30,7 @@ def config():
     subset = 'stream'
     ignore_buffer = False
     norm = False
-    per_sample = True # determines whether evaluation works on samples or frames (determined by stft)
+    per_sample = False # determines whether evaluation works on samples or frames (determined by stft)
 
 
 def partition_audio(ex):
