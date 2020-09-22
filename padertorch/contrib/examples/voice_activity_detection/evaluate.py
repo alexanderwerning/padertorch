@@ -45,6 +45,7 @@ def partition_audio(ex):
 
 
 def get_data(ex):
+    num_samples = ex['num_samples']
     dict_dataset = {}
     for index in range(math.ceil(num_samples / SEGMENT_LENGTH)):
         sub_ex = ex.copy()
@@ -56,8 +57,6 @@ def get_data(ex):
 
 
 def get_model_output(ex, model, per_sample):
-    num_samples = ex['num_samples']
-
     predictions = []
     sequence_lengths = []
     dataset = get_data(ex)
