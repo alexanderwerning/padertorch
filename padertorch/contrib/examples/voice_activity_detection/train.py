@@ -162,7 +162,7 @@ def get_model():
     return model
 
 
-def train(model):
+def train(model, storage_dir):
     train_set, validate_set = get_datasets()
     stop_trigger = 50000
     if DEBUG:
@@ -199,7 +199,7 @@ def main():
         print(output.shape, element['activity'].shape)
     else:
         model = get_model()
-        train(model)
+        train(model, storage_dir)
 
 
 if __name__ == '__main__':
