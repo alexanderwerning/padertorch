@@ -87,7 +87,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8):
         dataset = dataset.shuffle(reshuffle=True)
 
     dataset = dataset.prefetch(
-        num_workers=8, buffer_size=10*batch_size
+        num_workers=8, buffer_size=4*batch_size
     )
 
     dataset = dataset.map(audio_segmentation)
