@@ -25,7 +25,7 @@ def config():
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
     out_dir = '/home/awerning/out'
     num_ths = 201
-    buffer = 0.5
+    buffer_zone = 0.0
     ckpt = 'ckpt_latest.pth'
     subset = 'stream'
     ignore_buffer = False
@@ -44,11 +44,7 @@ def partition_audio(ex):
     return ex
 
 
-def get_model_output(ex, model, per_sample):
-    num_samples = ex['num_samples']
-
-    predictions = []
-    sequence_lengths = []
+def get_data(ex):
     dict_dataset = {}
     for index in range(math.ceil(num_samples / SEGMENT_LENGTH)):
         sub_ex = ex.copy()
@@ -56,7 +52,15 @@ def get_model_output(ex, model, per_sample):
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    dataset = prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
+    return prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
+
+
+def get_model_output(ex, model, per_sample):
+    num_samples = ex['num_samples']
+
+    predictions = []
+    sequence_lengths = []
+    dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         if per_sample:
@@ -72,7 +76,7 @@ def get_model_output(ex, model, per_sample):
             model_out = model_out_per_sample
         else:
             model_out = model_out_org
-        
+
         predictions.extend(model_out)
         sequence_lengths.extend(batch['seq_len'])
     return list(zip(predictions, sequence_lengths))
@@ -87,7 +91,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @ex.automain
-def main(model_dir, num_ths, buffer, ckpt, out_dir, subset, per_sample):
+def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
 
@@ -123,7 +127,7 @@ def main(model_dir, num_ths, buffer, ckpt, out_dir, subset, per_sample):
             out_dir = model_dir
         else:
             out_dir = Path(out_dir).expanduser().resolve()
-        (out_dir / f'tp_fp_tn_fn_fearless_{buffer}.txt').write_text(
+        (out_dir / f'tp_fp_tn_fn_fearless_{buffer_zone}.txt').write_text(
             '\n'.join([
                 ' '.join([str(v) for v in value]) for value in
                 tp_fp_tn_fn.tolist()
