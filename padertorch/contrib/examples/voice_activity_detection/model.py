@@ -49,11 +49,12 @@ class SAD_Classifier(Model):
             binarized = outputs > thres
             for key in [name.format(thres=thres) for name in scalar_names]:
                 true = binarized == activity
+                boolean_activity = activity > 0
                 false = ~true
-                tp = torch.sum(torch.bitwise_and(true, activity)).cpu().item()
-                fp = torch.sum(torch.bitwise_and(false, activity)).cpu().item()
-                tn = torch.sum(torch.bitwise_and(true, ~activity)).cpu().item()
-                fn = torch.sum(torch.bitwise_and(false, ~activity)).cpu().item()
+                tp = torch.sum(torch.bitwise_and(true, boolean_activity)).cpu().item()
+                fp = torch.sum(torch.bitwise_and(false, boolean_activity)).cpu().item()
+                tn = torch.sum(torch.bitwise_and(true, ~boolean_activity)).cpu().item()
+                fn = torch.sum(torch.bitwise_and(false, ~boolean_activity)).cpu().item()
                 results[key] = (tp, fp, tn, fn)
 
         summary = dict(
