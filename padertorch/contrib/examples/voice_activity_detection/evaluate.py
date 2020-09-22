@@ -65,7 +65,7 @@ def get_model_output(ex, model, per_sample):
         model_out_org = model(batch).detach().numpy()
         if per_sample:
             outputs_ex = []
-            for model_out_ex in model_out_org
+            for model_out_ex in model_out_org:
                 # convolve with STFT_LENGTH/STFT_SHIFT box window #intuition: once one overlapping frame is active, a sample should be active
                 model_out_conv = np.convolve(model_out_ex, np.ones(int(STFT_LENGTH / STFT_SHIFT)), )
                 # 4 = STFT_LENGTH/STFT_SHIFT -1
