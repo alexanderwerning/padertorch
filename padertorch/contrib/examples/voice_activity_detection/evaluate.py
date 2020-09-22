@@ -17,6 +17,7 @@ ex = sacred.Experiment('VAD Evaluation')
 STFT_SHIFT = 80
 STFT_LENGTH = 400
 SEGMENT_LENGTH = 8000 * 60
+TRAINED_MODEL = False
 
 
 
@@ -63,16 +64,20 @@ def get_model_output(ex, model, per_sample):
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         if per_sample:
-            #convolve with STFT_LENGTH/STFT_SHIFT box window #intuition: once one overlapping frame is active, a sample should be active
-            model_out_conv = np.convolve(model_out_org, np.ones(STFT_LENGTH / STFT_SHIFT))
-            # 4 = STFT_LENGTH/STFT_SHIFT -1
-            model_out_padded = np.zeros(model_out_conv.shape+STFT_LENGTH / STFT_SHIFT - 1)
-            model_out_padded[2:-2] = model_out_conv
-            model_out_padded[:2] = model_out_conv[0]
-            model_out_padded[-2:] = model_out_conv[-1]
-            # scale up by STFT_SHIFT
-            model_out_per_sample = np.repeat(model_out_padded, STFT_SHIFT)
-            model_out = model_out_per_sample
+            outputs_ex = []
+            for model_out_ex in model_out_org
+                # convolve with STFT_LENGTH/STFT_SHIFT box window #intuition: once one overlapping frame is active, a sample should be active
+                model_out_conv = np.convolve(model_out_ex, np.ones(int(STFT_LENGTH / STFT_SHIFT)), )
+                # 4 = STFT_LENGTH/STFT_SHIFT -1
+                model_out_padded = np.zeros(int(model_out_conv.shape+STFT_LENGTH / STFT_SHIFT - 1))
+                model_out_padded[2:-2] = model_out_conv
+                model_out_padded[:2] = model_out_conv[0]
+                model_out_padded[-2:] = model_out_conv[-1]
+                # scale up by STFT_SHIFT
+                model_out_per_sample_ex = np.repeat(model_out_padded, STFT_SHIFT)
+                model_out_ex = model_out_per_sample_ex
+                outputs_ex.append(model_out_ex)
+            model_out = np.stack(outputs_ex)
         else:
             model_out = model_out_org
 
@@ -95,8 +100,9 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     assert model_dir.exists(), model_dir
 
     model = get_model()
-    state_dict = torch.load(Path(model_dir/'ckpt_latest.pth'))['model']
-    model.load_state_dict(state_dict)
+    if TRAINED_MODEL:
+        state_dict = torch.load(Path(model_dir/'ckpt_latest.pth'))['model']
+        model.load_state_dict(state_dict)
     db = Fearless()
     model.eval()
 
@@ -105,7 +111,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
         if per_sample:
             return per_sample_vad
         else:
-            per_frame_vad = segment_axis(per_sample,
+            per_frame_vad = segment_axis(per_sample_vad,
                                          length=400,
                                          shift=80,
                                          end='pad'
@@ -126,7 +132,11 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
             out_dir = model_dir
         else:
             out_dir = Path(out_dir).expanduser().resolve()
-        (out_dir / f'tp_fp_tn_fn_fearless_{buffer_zone}.txt').write_text(
+        if TRAINED_MODEL:
+            output_file = out_dir / f'tp_fp_tn_fn_fearless_{buffer_zone}.txt'
+        else:
+            output_file = out_dir / f'tp_fp_tn_fn_fearless_{buffer_zone}_no_train.txt'
+        output_file.write_text(
             '\n'.join([
                 ' '.join([str(v) for v in value]) for value in
                 tp_fp_tn_fn.tolist()
