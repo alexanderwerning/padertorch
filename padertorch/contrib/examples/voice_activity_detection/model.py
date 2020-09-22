@@ -50,10 +50,10 @@ class SAD_Classifier(Model):
             for key in [name.format(thres=thres) for name in scalar_names]:
                 true = binarized == activity
                 false = ~true
-                tp = np.sum(np.bitwise_and(true, activity))
-                fp = np.sum(np.bitwise_and(false, activity))
-                tn = np.sum(np.bitwise_and(true, ~activity))
-                fn = np.sum(np.bitwise_and(false, ~activity))
+                tp = torch.sum(torch.bitwise_and(true, activity)).cpu().item()
+                fp = torch.sum(torch.bitwise_and(false, activity)).cpu().item()
+                tn = torch.sum(torch.bitwise_and(true, ~activity)).cpu().item()
+                fn = torch.sum(torch.bitwise_and(false, ~activity)).cpu().item()
                 results[key] = (tp, fp, tn, fn)
 
         summary = dict(
