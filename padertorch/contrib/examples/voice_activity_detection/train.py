@@ -101,6 +101,19 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
     )
+
+    def read_and_pad_audio(ex):
+        padding_front = abs(min(0, ex['audio_start_samples']))
+        padding_back = max(0, ex['audio_stop_samples']-ex['num_samples'])
+        ex['audio_start_samples'] = max(0, ex['audio_start_samples'])
+        ex['audio_stop_samples'] = min(ex['audio_stop_samples'], ex['num_samples'])
+        ex = audio_reader(ex)
+        ex_num_samples = ex['audio_stop_samples'] - ex['audio_start_samples']
+        padded_audio_data = np.zeros(padding_front+ex_num_samples+padding_back)
+        ex['audio_data'] = padded_audio_data[padding_front:-padding_back] = ex['audio_data'].flatten()
+
+        return ex
+
     dataset = dataset.map(audio_reader)
 
     stft = STFT(
@@ -112,7 +125,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
     )
 
     def calculate_stft(example):
-        complex_spectrum = stft(example['audio_data'].flatten())
+        complex_spectrum = stft(example['audio_data'])
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
         features = rearrange(real_magnitude[None, None, ...],
                              'b c f t -> b c t f', b=1, c=1)[:, :, :-1, :]
