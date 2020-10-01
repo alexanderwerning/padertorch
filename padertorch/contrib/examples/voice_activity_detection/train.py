@@ -127,8 +127,8 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
     def calculate_stft(example):
         complex_spectrum = stft(example['audio_data'])
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
-        features = rearrange(real_magnitude[None, None, ...],
-                             'b c f t -> b c t f', b=1, c=1)[:, :, :-1, :]
+        features = rearrange(real_magnitude[None, ...],
+                             'b c f t -> b c t f', b=1)[:, :, :-1, :]
         example['features'] = features
         example['activity'] = segment_axis(example['activity'],
                                            length=STFT_WINDOW_LENGTH,
