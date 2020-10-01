@@ -15,7 +15,7 @@ from padertorch.contrib.jensheit.eval_sad import evaluate_model
 ex = sacred.Experiment('VAD Evaluation')
 
 STFT_SHIFT = 80
-STFT_LENGTH = 400
+STFT_LENGTH = 200
 SEGMENT_LENGTH = 8000 * 60
 TRAINED_MODEL = True
 
@@ -25,7 +25,7 @@ def config():
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
     out_dir = '/home/awerning/out'
     num_ths = 201
-    buffer_zone = 0.0
+    buffer_zone = 0.5
     ckpt = 'ckpt_latest.pth'
     subset = 'stream'
     ignore_buffer = False
@@ -35,8 +35,8 @@ def config():
 def partition_audio(ex):
     num_samples = ex['num_samples']
     index = ex['index']
-    start = max(index * SEGMENT_LENGTH-2*STFT_SHIFT, 0)
-    stop = min((index+1) * SEGMENT_LENGTH+2*STFT_SHIFT, num_samples)
+    start = max(index * SEGMENT_LENGTH-STFT_SHIFT, 0)
+    stop = min((index+1) * SEGMENT_LENGTH+STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
@@ -92,8 +92,8 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
         per_sample_vad = db.get_activity(ex)[:]
 
         per_frame_vad = segment_axis(per_sample_vad,
-                                     length=400,
-                                     shift=80,
+                                     length=STFT_LENGTH,
+                                     shift=STFT_SHIFT,
                                      end='pad'
                                      ).any(axis=-1)
         return per_frame_vad

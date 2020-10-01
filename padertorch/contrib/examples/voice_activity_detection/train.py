@@ -31,6 +31,11 @@ from einops import rearrange
 DEBUG = False
 DATA_TEST = False
 
+STFT_SHIFT = 80
+STFT_WINDOW_LENGTH = 200
+STFT_SIZE = 256
+STFT_PAD = True
+
 
 def get_datasets():
     db = Fearless()
@@ -64,7 +69,7 @@ def select_speech(example):
     first_speech = example['activity'].intervals[0][0]
     max_time_buffer = 8000 * 15 # 15s
     time_buffer = np.random.randint(max_time_buffer)
-    length = 8000 * 30 # 30s
+    length = 8000 * 30  # 30s
     start = max(0, first_speech-time_buffer)
     stop = start + length
     example['audio_start_samples'] = start
@@ -97,11 +102,6 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         source_sample_rate=8000, target_sample_rate=8000
     )
     dataset = dataset.map(audio_reader)
-
-    STFT_SHIFT = 80
-    STFT_WINDOW_LENGTH = 400
-    STFT_SIZE = 512
-    STFT_PAD = True
 
     stft = STFT(
         shift=STFT_SHIFT,
