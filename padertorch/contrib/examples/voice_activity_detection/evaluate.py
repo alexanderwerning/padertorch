@@ -36,7 +36,11 @@ def partition_audio(ex):
     num_samples = ex['num_samples']
     index = ex['index']
     start = max(index * SEGMENT_LENGTH-0*STFT_SHIFT, 0)
-    stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
+    stop = start + SEGMENT_LENGTH + STFT_SHIFT
+    if stop > num_samples:
+        start-= stop-num_samples
+        stop = num_samples
+    #stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
