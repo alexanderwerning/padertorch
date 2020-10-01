@@ -68,7 +68,7 @@ def get_model_output(ex, model):
         model_out = model_out_org[buffer_size:-buffer_size]
 
         predictions.extend(model_out)
-        sequence_lengths.extend(batch['seq_len'] - 2*buffer_size)
+        sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
     return list(zip(predictions, sequence_lengths))
 
 
