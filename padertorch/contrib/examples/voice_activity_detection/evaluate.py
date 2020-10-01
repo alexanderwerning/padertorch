@@ -16,7 +16,8 @@ ex = sacred.Experiment('VAD Evaluation')
 
 STFT_SHIFT = 80
 STFT_LENGTH = 200
-SEGMENT_LENGTH = 8000 * 60
+SAMPLE_RATE = 8000
+SEGMENT_LENGTH = SAMPLE_RATE * 60
 TRAINED_MODEL = True
 
 
@@ -35,14 +36,14 @@ def config():
 def partition_audio(ex):
     num_samples = ex['num_samples']
     index = ex['index']
-    start = max(index * SEGMENT_LENGTH-0*STFT_SHIFT, 0)
-    stop = start + SEGMENT_LENGTH + STFT_SHIFT
-    if stop > num_samples:
-        start-= stop-num_samples
-        stop = num_samples
+    start = index * SEGMENT_LENGTH
+    stop = start + SEGMENT_LENGTH
+    ex['example_start'] = start
+    ex['example_stop'] = stop
+    
     #stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
-    ex['audio_start_samples'] = start
-    ex['audio_stop_samples'] = stop
+    ex['audio_start_samples'] = max(0, start- SAMPLE_RATE/2)
+    ex['audio_stop_samples'] = min(stop+SAMPLE_RATE/2, num_samples)
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
@@ -65,7 +66,9 @@ def get_model_output(ex, model):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        model_out = model_out_org
+        buffer_start = (ex['example_start']-ex['audio_start_samples'])/STFT_SHIFT
+        buffer_end = (ex['example_stop']-ex['audio_start_samples'])/STFT_SHIFT
+        model_out = model_out_org[buffer_start:buffer_end]
 
         predictions.extend(model_out)
         sequence_lengths.extend(batch['seq_len'])
