@@ -105,7 +105,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
             lambda out, th: get_binary_classification(out, th),
             lambda ex: get_target_fn(ex),
             num_thresholds=num_ths,
-            buffer_zone=0
+            buffer_zone=buffer_zone
         )
     if dlp_mpi.IS_MASTER:
         if out_dir is None:
