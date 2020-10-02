@@ -65,7 +65,7 @@ def get_model_output(ex, model):
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         buffer_size = SAMPLE_RATE//2//STFT_SHIFT
-        model_out = model_out_org[buffer_size:-buffer_size]
+        model_out = model_out_org[:, buffer_size:-buffer_size]
 
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
