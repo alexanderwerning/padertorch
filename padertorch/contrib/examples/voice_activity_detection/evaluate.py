@@ -66,7 +66,7 @@ def get_model_output(ex, model):
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         buffer_size = BUFFER_SIZE//STFT_SHIFT
-        overlap = STFT_LENGTH/STFT_SHIFT
+        overlap = STFT_LENGTH/STFT_SHIFT/2
         model_out = model_out_org[:, buffer_size-int(overlap):-buffer_size+int(math.ceil(overlap))]
         print("model_out shape", model_out.shape)
         predictions.extend(model_out)
