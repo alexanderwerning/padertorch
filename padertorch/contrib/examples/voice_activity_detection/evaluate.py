@@ -36,7 +36,6 @@ def config():
 
 def partition_audio(ex):
     num_samples = ex['num_samples']
-    print("num_samples", num_samples)
     index = ex['index']
     start = index * SEGMENT_LENGTH
     stop = min(start + SEGMENT_LENGTH, num_samples)
@@ -51,7 +50,7 @@ def partition_audio(ex):
 def get_data(ex):
     num_samples = ex['num_samples']
     dict_dataset = {}
-    print("number of segments:", math.ceil(num_samples / SEGMENT_LENGTH), "max sample:", (math.ceil(num_samples / SEGMENT_LENGTH)-1)*SEGMENT_LENGTH)
+    print("number of segments:", math.ceil(num_samples / SEGMENT_LENGTH))
     for index in range(math.ceil(num_samples / SEGMENT_LENGTH)):
         sub_ex = ex.copy()
         sub_ex['index'] = index
@@ -66,6 +65,7 @@ def get_model_output(ex, model):
     sequence_lengths = []
     dataset = get_data(ex)
     for batch in dataset:
+        print("model_in shape", batch.detach().numpy().shape)
         model_out_org = model(batch).detach().numpy()
         buffer_size = BUFFER_SIZE//STFT_SHIFT
         overlap = STFT_LENGTH/STFT_SHIFT/2
