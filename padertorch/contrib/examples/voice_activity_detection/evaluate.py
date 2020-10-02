@@ -41,7 +41,7 @@ def partition_audio(ex):
 
     # stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start - SAMPLE_RATE//2
-    ex['audio_stop_samples'] = stop+SAMPLE_RATE//2
+    ex['audio_stop_samples'] = stop + SAMPLE_RATE//2
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
@@ -64,7 +64,7 @@ def get_model_output(ex, model):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        buffer_size = SAMPLE_RATE//2//STFT_SHIFT
+        buffer_size = SAMPLE_RATE//2//STFT_SHIFT+max(0, floor(STFT_LENGTH/STFT_SHIFT)-1)
         model_out = model_out_org[:, buffer_size:-buffer_size]
 
         predictions.extend(model_out)
