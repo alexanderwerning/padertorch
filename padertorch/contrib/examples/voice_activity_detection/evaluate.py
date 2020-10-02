@@ -17,7 +17,7 @@ ex = sacred.Experiment('VAD Evaluation')
 STFT_SHIFT = 80
 STFT_LENGTH = 200
 SAMPLE_RATE = 8000
-SEGMENT_LENGTH = SAMPLE_RATE * 1
+SEGMENT_LENGTH = SAMPLE_RATE * 60
 TRAINED_MODEL = True
 
 
@@ -66,7 +66,7 @@ def get_model_output(ex, model):
         model_out_org = model(batch).detach().numpy()
         buffer_size = SAMPLE_RATE//2//STFT_SHIFT+max(0, int(STFT_LENGTH/STFT_SHIFT)-1)
         model_out = model_out_org[:, buffer_size:-buffer_size]
-
+        print("model_out shape", model_out.shape)
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
     return list(zip(predictions, sequence_lengths))
@@ -77,6 +77,8 @@ def get_binary_classification(model_out, threshold):
     for prediction, seq_len in model_out:
         binarized_prediction = prediction > threshold
         vad.append(binarized_prediction)
+        
+    print("len of vad", list(map(lambda x: x.shape, vad)))
     return np.concatenate(vad, axis=-1)
 
 
