@@ -18,6 +18,7 @@ STFT_SHIFT = 80
 STFT_LENGTH = 200
 SAMPLE_RATE = 8000
 SEGMENT_LENGTH = SAMPLE_RATE * 60
+BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
 TRAINED_MODEL = True
 
 
@@ -40,8 +41,8 @@ def partition_audio(ex):
     stop = min(start + SEGMENT_LENGTH, num_samples)
 
     # stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
-    ex['audio_start_samples'] = start - SAMPLE_RATE//2
-    ex['audio_stop_samples'] = stop + SAMPLE_RATE//2
+    ex['audio_start_samples'] = start - BUFFER_SIZE
+    ex['audio_stop_samples'] = stop + BUFFER_SIZE
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
@@ -64,8 +65,9 @@ def get_model_output(ex, model):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        buffer_size = SAMPLE_RATE//2//STFT_SHIFT+max(0, int(STFT_LENGTH/STFT_SHIFT)-1)
-        model_out = model_out_org[:, buffer_size:-buffer_size]
+        buffer_size = BUFFER_SIZE//STFT_SHIFT
+        overlap = STFT_LENGTH/STFT_SHIFT
+        model_out = model_out_org[:, buffer_size+int(overlap):-(buffer_size+int(math.ceil(overlap)))]
         print("model_out shape", model_out.shape)
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
