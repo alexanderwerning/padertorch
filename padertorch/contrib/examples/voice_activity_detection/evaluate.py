@@ -65,7 +65,7 @@ def get_model_output(ex, model):
     sequence_lengths = []
     dataset = get_data(ex)
     for batch in dataset:
-        print("model_in shape", batch.detach().numpy().shape)
+        print("model_in shape", batch['features'].numpy().shape)
         model_out_org = model(batch).detach().numpy()
         buffer_size = BUFFER_SIZE//STFT_SHIFT
         overlap = STFT_LENGTH/STFT_SHIFT/2
