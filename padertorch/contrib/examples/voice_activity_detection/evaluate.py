@@ -82,7 +82,7 @@ def get_binary_classification(model_out, threshold):
         binarized_prediction = prediction > threshold
         vad.append(binarized_prediction)
         
-    print("len of vad", list(map(lambda x: x.shape, vad)))
+    print("len of vad", sum(list(map(lambda x: x.shape[0], vad))))
     return np.concatenate(vad, axis=-1)
 
 
