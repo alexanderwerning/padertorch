@@ -64,7 +64,7 @@ def get_model_output(ex, model):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        buffer_size = SAMPLE_RATE//2//STFT_SHIFT+max(0, floor(STFT_LENGTH/STFT_SHIFT)-1)
+        buffer_size = SAMPLE_RATE//2//STFT_SHIFT+max(0, int(STFT_LENGTH/STFT_SHIFT)-1)
         model_out = model_out_org[:, buffer_size:-buffer_size]
 
         predictions.extend(model_out)
