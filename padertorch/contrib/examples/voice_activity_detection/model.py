@@ -46,15 +46,16 @@ class SAD_Classifier(Model):
         ]
         results = {}
         for thres in [0.3, 0.5]:
-            binarized = outputs > thres
+            binarized_prediction = outputs > thres
             for key in [name.format(thres=thres) for name in scalar_names]:
-                true = binarized == activity
-                boolean_activity = activity > 0
-                false = ~true
+                boolean_activity = activity > 0  # activity should already be binary?
+                true = binarized_prediction == boolean_activity
+                false = np.bitwise_not(true)
+                assert np.sum(true + false) == binarized_prediction.size()
                 tp = torch.sum(torch.bitwise_and(true, boolean_activity)).cpu().item()
                 fp = torch.sum(torch.bitwise_and(false, boolean_activity)).cpu().item()
-                tn = torch.sum(torch.bitwise_and(true, ~boolean_activity)).cpu().item()
-                fn = torch.sum(torch.bitwise_and(false, ~boolean_activity)).cpu().item()
+                tn = torch.sum(torch.bitwise_and(true, np.bitwise_not(boolean_activity))).cpu().item()
+                fn = torch.sum(torch.bitwise_and(false, np.bitwise_not(boolean_activity))).cpu().item()
                 results[key] = (tp, fp, tn, fn)
 
         summary = dict(
