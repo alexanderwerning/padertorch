@@ -110,6 +110,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         ex['audio_stop_samples'] = min(ex['audio_stop_samples'], ex['num_samples'])
         ex = audio_reader(ex)
         padded_audio_data = np.zeros((padding_front+ex_num_samples+padding_back))
+        print("padding",padding_front,ex_num_samples,padding_back,padding_front+ex_num_samples+padding_back)
         padded_audio_data[padding_front:-padding_back] = ex['audio_data'].flatten()
         ex['audio_data'] = padded_audio_data
 
