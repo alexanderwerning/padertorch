@@ -47,14 +47,16 @@ class SAD_Classifier(Model):
         results = {}
         for thres in [0.3, 0.5]:
             binarized_prediction = outputs > thres
-            for key in [name.format(thres=thres) for name in scalar_names]:
-                boolean_activity = activity > 0
-                tp = torch.sum(binarized_prediction & boolean_activity).cpu().item()
-                fp = torch.sum(binarized_prediction & ~boolean_activity).cpu().item()
-                tn = torch.sum(~binarized_prediction & ~boolean_activity).cpu().item()
-                fn = torch.sum(~binarized_prediction & boolean_activity).cpu().item()
-                assert tp + fp + tn + fn == torch.numel(binarized_prediction), (tp + fp + tn + fn, torch.numel(binarized_prediction))
-                results[key] = (tp, fp, tn, fn)
+            
+            boolean_activity = activity > 0
+            tp = torch.sum(binarized_prediction & boolean_activity).cpu().item()
+            fp = torch.sum(binarized_prediction & ~boolean_activity).cpu().item()
+            tn = torch.sum(~binarized_prediction & ~boolean_activity).cpu().item()
+            fn = torch.sum(~binarized_prediction & boolean_activity).cpu().item()
+            assert tp + fp + tn + fn == torch.numel(binarized_prediction), (tp + fp + tn + fn, torch.numel(binarized_prediction))
+            keys = [name.format(thres=thres) for name in scalar_names]
+            values = [tp, fp, tn, fn]
+            results.update(zip(keys, values))
 
         summary = dict(
             loss=bce.mean(),
