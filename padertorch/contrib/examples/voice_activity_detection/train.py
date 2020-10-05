@@ -67,7 +67,7 @@ def select_speech(example):
     We evaluate the model on 30s audio segments which contain speech.
     """
     first_speech = example['activity'].intervals[0][0]
-    max_time_buffer = 8000 * 15 # 15s
+    max_time_buffer = 8000 * 1 # 1s
     time_buffer = np.random.randint(max_time_buffer)
     length = 8000 * 30  # 30s
     start = max(0, first_speech-time_buffer)
