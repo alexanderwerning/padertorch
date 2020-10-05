@@ -116,7 +116,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
 
         return ex
 
-    dataset = dataset.map(audio_reader)
+    dataset = dataset.map(read_and_pad_audio)
 
     stft = STFT(
         shift=STFT_SHIFT,
