@@ -53,7 +53,7 @@ class SAD_Classifier(Model):
                 fp = torch.sum(binarized_prediction & ~boolean_activity).cpu().item()
                 tn = torch.sum(~binarized_prediction & ~boolean_activity).cpu().item()
                 fn = torch.sum(~binarized_prediction & boolean_activity).cpu().item()
-                assert tp + fp + tn + fn == binarized_prediction.size(), (tp + fp + tn + fn, binarized_prediction.size())
+                assert tp + fp + tn + fn == torch.numel(binarized_prediction), (tp + fp + tn + fn, torch.numel(binarized_prediction))
                 results[key] = (tp, fp, tn, fn)
 
         summary = dict(
