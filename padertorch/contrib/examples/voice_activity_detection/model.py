@@ -47,9 +47,9 @@ class SAD_Classifier(Model):
         results = {}
         for thres in [0.3, 0.5]:
             binarized_prediction = outputs > thres
-            assert binarized_prediction.dtype = np.dtype('bool'), binarized_prediction.dtype
+            assert binarized_prediction.dtype == np.dtype('bool'), binarized_prediction.dtype
             boolean_activity = activity > 0
-            assert boolean_activity.dtype = np.dtype('bool'), boolean_activity.dtype
+            assert boolean_activity.dtype == np.dtype('bool'), boolean_activity.dtype
             tp = torch.sum(binarized_prediction & boolean_activity).cpu().item()
             fp = torch.sum(binarized_prediction & ~boolean_activity).cpu().item()
             tn = torch.sum(~binarized_prediction & ~boolean_activity).cpu().item()
