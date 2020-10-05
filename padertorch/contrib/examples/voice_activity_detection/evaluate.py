@@ -43,7 +43,6 @@ def partition_audio(ex):
     # stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start - BUFFER_SIZE
     ex['audio_stop_samples'] = stop + BUFFER_SIZE
-    print(ex['audio_start_samples'], ex['audio_stop_samples'])
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
@@ -51,7 +50,6 @@ def partition_audio(ex):
 def get_data(ex):
     num_samples = ex['num_samples']
     dict_dataset = {}
-    print("number of segments:", math.ceil(num_samples / SEGMENT_LENGTH))
     for index in range(math.ceil(num_samples / SEGMENT_LENGTH)):
         sub_ex = ex.copy()
         sub_ex['index'] = index
@@ -87,7 +85,6 @@ def get_binary_classification(model_out, threshold):
         binarized_prediction = prediction > threshold
         vad.append(binarized_prediction)
 
-    print("len of vad", sum(list(map(lambda x: x.shape[0], vad))))
     return np.concatenate(vad, axis=-1)
 
 
@@ -105,7 +102,6 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
 
     def get_target_fn(ex):
         per_sample_vad = db.get_activity(ex)[:]
-        print("example annotatnion len", per_sample_vad.shape)
         per_frame_vad = segment_axis(per_sample_vad,
                                      length=STFT_LENGTH,
                                      shift=STFT_SHIFT,
