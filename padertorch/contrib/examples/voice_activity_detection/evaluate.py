@@ -61,7 +61,7 @@ def get_data(ex):
     return prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
 
 
-def get_model_output(ex, model):
+def get_model_output(ex, model, per_sample):
     predictions = []
     sequence_lengths = []
     dataset = get_data(ex)
