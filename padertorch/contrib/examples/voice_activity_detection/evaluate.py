@@ -76,7 +76,7 @@ def get_model_output(ex, model):
             model_out = activity_frequency_to_time(
                                                 model_out,
                                                 stft_window_length=STFT_LENGTH,
-                                                stft_shift=STFT_SHIFT
+                                                stft_shift=STFT_SHIFT,
                                                 time_length=None)
 
         predictions.extend(model_out)
