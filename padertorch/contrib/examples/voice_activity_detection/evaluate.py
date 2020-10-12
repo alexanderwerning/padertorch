@@ -64,14 +64,12 @@ def get_model_output(ex, model):
     sequence_lengths = []
     dataset = get_data(ex)
     for batch in dataset:
-        print("model_in shape", batch['features'].numpy().shape)
         model_out_org = model(batch).detach().numpy()
         buffer_size = BUFFER_SIZE//STFT_SHIFT
         overlap = STFT_LENGTH/STFT_SHIFT/2
         buffer_front = buffer_size-max(0, int(overlap)-1)
         buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
         model_out = model_out_org[:, buffer_front:-buffer_back]
-        print("model_out shape", model_out.shape)
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
     # fixme
