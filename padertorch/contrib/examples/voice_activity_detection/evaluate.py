@@ -78,7 +78,7 @@ def get_model_output(ex, model, per_sample):
                                                 model_out,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT,
-                                                time_length=None)
+                                                stft_fading=None)
 
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
