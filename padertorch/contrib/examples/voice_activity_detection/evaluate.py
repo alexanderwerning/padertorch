@@ -15,7 +15,8 @@ from padertorch.contrib.jensheit.eval_sad import evaluate_model
 ex = sacred.Experiment('VAD Evaluation')
 
 STFT_SHIFT = 80
-STFT_LENGTH = 200
+STFT_WINDOW_LENGTH = 200
+STFT_SIZE = 256
 SAMPLE_RATE = 8000
 SEGMENT_LENGTH = SAMPLE_RATE * 60
 BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
@@ -32,6 +33,7 @@ def config():
     subset = 'stream'
     ignore_buffer = False
     norm = False
+    per_sample = True
 
 
 def partition_audio(ex):
@@ -66,10 +68,17 @@ def get_model_output(ex, model):
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         buffer_size = BUFFER_SIZE//STFT_SHIFT
-        overlap = STFT_LENGTH/STFT_SHIFT/2
+        overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
         buffer_front = buffer_size-max(0, int(overlap)-1)
         buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
         model_out = model_out_org[:, buffer_front:-buffer_back]
+        if per_sample:
+            model_out = activity_frequency_to_time(
+                                                model_out,
+                                                stft_window_length=STFT_LENGTH,
+                                                stft_shift=STFT_SHIFT
+                                                time_length=None)
+
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
     # fixme
@@ -87,7 +96,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @ex.automain
-def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
+def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
 
@@ -98,10 +107,12 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
     db = Fearless()
     model.eval()
 
-    def get_target_fn(ex):
+    def get_target_fn(ex, per_sample):
         per_sample_vad = db.get_activity(ex)[:]
+        if per_sample:
+            return per_sample_vad
         per_frame_vad = segment_axis(per_sample_vad,
-                                     length=STFT_LENGTH,
+                                     length=STFT_WINDOW_LENGTH,
                                      shift=STFT_SHIFT,
                                      end='pad'
                                      ).any(axis=-1)
@@ -110,9 +121,9 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
-            lambda ex: get_model_output(ex, model),
+            lambda ex: get_model_output(ex, model, per_sample),
             lambda out, th: get_binary_classification(out, th),
-            lambda ex: get_target_fn(ex),
+            lambda ex: get_target_fn(ex, per_sample),
             num_thresholds=num_ths,
             buffer_zone=buffer_zone
         )
