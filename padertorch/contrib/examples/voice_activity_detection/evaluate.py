@@ -7,6 +7,7 @@ import sacred
 import torch
 import lazy_dataset
 from paderbox.array import segment_axis
+from padercontrib.database.chime5.database import activity_frequency_to_time
 from padercontrib.database.fearless import Fearless
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model
