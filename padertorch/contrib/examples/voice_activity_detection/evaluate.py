@@ -76,7 +76,7 @@ def get_model_output(ex, model, per_sample):
         if per_sample:
             model_out = activity_frequency_to_time(
                                                 model_out,
-                                                stft_window_length=STFT_LENGTH,
+                                                stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT,
                                                 time_length=None)
 
