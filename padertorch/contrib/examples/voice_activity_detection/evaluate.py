@@ -75,7 +75,7 @@ def get_model_output(ex, model, per_sample):
                                                 stft_shift=STFT_SHIFT,
                                                 stft_fading=None)
             model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE]
-            model_out = model_out[:-(model_out.shape[0]-ex['activity'].shape[0])]
+            model_out = model_out[:-(model_out.shape[0]-Fearless.get_activity(ex).shape[0])]
         else:
             buffer_size = BUFFER_SIZE//STFT_SHIFT
             overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
