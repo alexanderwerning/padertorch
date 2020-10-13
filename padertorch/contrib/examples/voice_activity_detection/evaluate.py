@@ -87,7 +87,7 @@ def get_model_output(ex, model, per_sample):
     print(list(map(lambda x: x.shape, predictions)))
     # fixme
     #predictions[-1] = predictions[-1][:-1]
-    return np.concatenate(predictions, axis=-1)
+    return predictions  # np.concatenate(predictions, axis=-1)
 
 
 def get_binary_classification(model_out, threshold):
