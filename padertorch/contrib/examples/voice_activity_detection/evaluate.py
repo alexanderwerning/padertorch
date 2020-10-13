@@ -11,7 +11,7 @@ from padercontrib.database.chime5.database import activity_frequency_to_time
 from padercontrib.database.fearless import Fearless
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model
-from padertorch.contrib.jensheit.eval_sad import evaluate_model, smoothed_vad
+from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
 
 ex = sacred.Experiment('VAD Evaluation')
 
