@@ -83,7 +83,7 @@ def get_model_output(ex, model, per_sample, db):
         predictions.extend(model_out)
 
     cumulated_samples = 0
-    print(ex.keys())
+
     for i, prediction in enumerate(predictions):
         if i < len(predictions)-1:
             prediction = prediction[BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
@@ -91,6 +91,7 @@ def get_model_output(ex, model, per_sample, db):
         else:
             stop = BUFFER_SIZE + ex['num_samples'] - cumulated_samples
             prediction = prediction[BUFFER_SIZE:stop]
+    print(list(map(lambda x: x.shape, predictions)))
     return predictions
 
 
