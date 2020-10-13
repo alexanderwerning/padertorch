@@ -82,6 +82,7 @@ def get_model_output(ex, model, per_sample):
 
         predictions.extend(model_out)
         sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
+    print(list(map(lambda x: x.shape, predictions)))
     # fixme
     predictions[-1] = predictions[-1][:-1]
     return list(zip(predictions, sequence_lengths))
