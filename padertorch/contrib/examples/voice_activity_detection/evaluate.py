@@ -68,24 +68,26 @@ def get_model_output(ex, model, per_sample):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        buffer_size = BUFFER_SIZE//STFT_SHIFT
-        overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-        buffer_front = buffer_size-max(0, int(overlap)-1)
-        buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
-        model_out = model_out_org[:, buffer_front:-buffer_back]
         if per_sample:
-            model_out = activity_frequency_to_time(
-                                                model_out,
+            model_out_per_sample = activity_frequency_to_time(
+                                                model_out_org,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT,
                                                 stft_fading=None)
+            model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE]
+        else:
+            buffer_size = BUFFER_SIZE//STFT_SHIFT
+            overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
+            buffer_front = buffer_size-max(0, int(overlap)-1)
+            buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
+            model_out = model_out_org[:, buffer_front:-buffer_back]
 
         predictions.extend(model_out)
-        sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
+        #sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
     print(list(map(lambda x: x.shape, predictions)))
     # fixme
-    predictions[-1] = predictions[-1][:-1]
-    return list(zip(predictions, sequence_lengths))
+    #predictions[-1] = predictions[-1][:-1]
+    return np.concatenate(predictions, axis=-1)
 
 
 def get_binary_classification(model_out, threshold):
