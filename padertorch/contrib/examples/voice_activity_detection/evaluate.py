@@ -89,6 +89,7 @@ def get_model_output(ex, model, per_sample, db):
             predictions[i] = prediction[BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
             cumulated_samples += prediction.shape[0]
         else:
+            print(BUFFER_SIZE,ex['num_samples'],cumulated_samples)
             stop = BUFFER_SIZE + ex['num_samples'] - cumulated_samples
             predictions[i] = prediction[BUFFER_SIZE:stop]
     print(list(map(lambda x: x.shape, predictions)))
