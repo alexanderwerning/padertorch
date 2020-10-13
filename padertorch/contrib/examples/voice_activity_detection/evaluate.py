@@ -90,7 +90,7 @@ def get_model_output(ex, model, per_sample):
 def get_binary_classification(model_out, threshold):
     vad = list()
     for prediction, seq_len in model_out:
-        smoothed_vad = smooth_vad(prediction, threshold=threshold, window=STFT_WINDOW_LENGTH)
+        smoothed_vad = smooth_vad(prediction, threshold=threshold)
         vad.append(smoothed_vad)
 
     return np.concatenate(vad, axis=-1)
