@@ -62,7 +62,7 @@ def get_data(ex):
     return prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
 
 
-def get_model_output(ex, model, per_sample):
+def get_model_output(ex, model, per_sample, db):
     predictions = []
     sequence_lengths = []
     dataset = get_data(ex)
@@ -75,7 +75,7 @@ def get_model_output(ex, model, per_sample):
                                                 stft_shift=STFT_SHIFT,
                                                 stft_fading=None)
             model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE]
-            model_out = model_out[:-(model_out.shape[0]-Fearless.get_activity(ex).shape[0])]
+            model_out = model_out[:-(model_out.shape[0]-db.get_activity(ex).shape[0])]
         else:
             buffer_size = BUFFER_SIZE//STFT_SHIFT
             overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
@@ -121,7 +121,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
-            lambda ex: get_model_output(ex, model, per_sample),
+            lambda ex: get_model_output(ex, model, per_sample, db),
             lambda out, th, ex: get_binary_classification(out, th),
             lambda ex: get_target_fn(ex, per_sample),
             num_thresholds=num_ths,
