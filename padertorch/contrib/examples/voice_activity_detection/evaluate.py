@@ -123,7 +123,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
             lambda ex: get_model_output(ex, model, per_sample),
-            lambda out, th: get_binary_classification(out, th),
+            lambda out, th, ex: get_binary_classification(out, th),
             lambda ex: get_target_fn(ex, per_sample),
             num_thresholds=num_ths,
             buffer_zone=buffer_zone
