@@ -74,7 +74,8 @@ def get_model_output(ex, model, per_sample):
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT,
                                                 stft_fading=None)
-            model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
+            model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE]
+            model_out = model_out[:-(model_out.shape[0]-ex['activity'].shape[0])]
         else:
             buffer_size = BUFFER_SIZE//STFT_SHIFT
             overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
@@ -83,10 +84,7 @@ def get_model_output(ex, model, per_sample):
             model_out = model_out_org[:, buffer_front:-buffer_back]
 
         predictions.extend(model_out)
-        #sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
-    # fixme
-    #predictions[-1] = predictions[-1][:-1]
-    return predictions  # np.concatenate(predictions, axis=-1)
+    return predictions
 
 
 def get_binary_classification(model_out, threshold):
@@ -94,7 +92,6 @@ def get_binary_classification(model_out, threshold):
     for prediction in model_out:
         smoothed_vad = smooth_vad(prediction, threshold=threshold)
         vad.append(smoothed_vad)
-    print(list(map(len, vad)))
     return np.concatenate(vad, axis=-1)
 
 
@@ -113,7 +110,6 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     def get_target_fn(ex, per_sample):
         per_sample_vad = db.get_activity(ex)[:]
         if per_sample:
-            print(per_sample_vad.shape)
             return per_sample_vad
         per_frame_vad = segment_axis(per_sample_vad,
                                      length=STFT_WINDOW_LENGTH,
