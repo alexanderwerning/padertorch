@@ -74,7 +74,7 @@ def get_model_output(ex, model, per_sample):
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT,
                                                 stft_fading=None)
-            model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT]
+            model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
         else:
             buffer_size = BUFFER_SIZE//STFT_SHIFT
             overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
