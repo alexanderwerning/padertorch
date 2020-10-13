@@ -69,21 +69,28 @@ def get_model_output(ex, model, per_sample, db):
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
         if per_sample:
-            model_out_per_sample = activity_frequency_to_time(
+            model_out = activity_frequency_to_time(
                                                 model_out_org,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT,
                                                 stft_fading=None)
-            model_out = model_out_per_sample[:, BUFFER_SIZE:-BUFFER_SIZE]
-            model_out = model_out[:-(model_out.shape[0]-db.get_activity(ex).shape[0])]
         else:
             buffer_size = BUFFER_SIZE//STFT_SHIFT
             overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
             buffer_front = buffer_size-max(0, int(overlap)-1)
             buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
             model_out = model_out_org[:, buffer_front:-buffer_back]
-
         predictions.extend(model_out)
+
+    cumulated_samples = 0
+    print(ex.keys())
+    for i, prediction in enumerate(predictions):
+        if i < len(predictions)-1:
+            prediction =  prediction[:, BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
+            cumulated_samples += prediction.shape[1]
+        else:
+            stop = BUFFERSIZE+ex['num_samples']-cumulated_samples
+            prediction = prediction[:, BUFFER_SIZE:stop]
     return predictions
 
 
