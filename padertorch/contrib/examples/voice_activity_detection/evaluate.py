@@ -11,7 +11,7 @@ from padercontrib.database.chime5.database import activity_frequency_to_time
 from padercontrib.database.fearless import Fearless
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model
-from padertorch.contrib.jensheit.eval_sad import evaluate_model
+from padertorch.contrib.jensheit.eval_sad import evaluate_model, smoothed_vad
 
 ex = sacred.Experiment('VAD Evaluation')
 
@@ -46,6 +46,7 @@ def partition_audio(ex):
     # stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start - BUFFER_SIZE
     ex['audio_stop_samples'] = stop + BUFFER_SIZE
+    ex['num_samples'] = ex['audio_stop_samples']-
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
@@ -90,8 +91,8 @@ def get_model_output(ex, model, per_sample):
 def get_binary_classification(model_out, threshold):
     vad = list()
     for prediction, seq_len in model_out:
-        binarized_prediction = prediction > threshold
-        vad.append(binarized_prediction)
+        smoothed_vad = smooth_vad(prediction, threshold=threshold, window=STFT_WINDOW_LENGTH)
+        vad.append(smoothed_vad)
 
     return np.concatenate(vad, axis=-1)
 
