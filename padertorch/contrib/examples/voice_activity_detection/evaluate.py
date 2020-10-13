@@ -84,7 +84,6 @@ def get_model_output(ex, model, per_sample):
 
         predictions.extend(model_out)
         #sequence_lengths.extend(list(map(lambda len: len - 2*buffer_size, batch['seq_len'])))
-    print(list(map(lambda x: x.shape, predictions)))
     # fixme
     #predictions[-1] = predictions[-1][:-1]
     return predictions  # np.concatenate(predictions, axis=-1)
@@ -114,6 +113,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     def get_target_fn(ex, per_sample):
         per_sample_vad = db.get_activity(ex)[:]
         if per_sample:
+            print(per_sample_vad.shape)
             return per_sample_vad
         per_frame_vad = segment_axis(per_sample_vad,
                                      length=STFT_WINDOW_LENGTH,
