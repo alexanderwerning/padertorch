@@ -35,6 +35,8 @@ STFT_SHIFT = 80
 STFT_WINDOW_LENGTH = 200
 STFT_SIZE = 256
 STFT_PAD = True
+SAMPLE_RATE = 8000
+BUFFER_SIZE = SAMPLE_RATE // 2
 
 
 def get_datasets():
@@ -50,10 +52,9 @@ def get_datasets():
 def chunker(example):
     """Cut out a random 4s segment from the stream for training."""
     # 4s at 8kHz -> 32k samples
-    chunk_length = 4 * 8000
-    start = max(0, np.random.randint(example['num_samples'])-chunk_length)
-    stop = min(start + chunk_length, example['num_samples'])
-    example.update(num_samples=stop-start)
+    chunk_length = 4 * SAMPLE_RATE + 2*BUFFER_SIZE
+    start = max(0, np.random.randint(example['num_samples'])-chunk_length)-BUFFER_SIZE
+    stop = start + chunk_length
     example.update(audio_start_samples=start)
     example.update(audio_stop_samples=stop)
     example.update(audio_path=example['audio_path'])
@@ -134,6 +135,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         features = rearrange(real_magnitude[None, None, ...],
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
         example['features'] = features
+        example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'],
                                            length=STFT_WINDOW_LENGTH,
                                            shift=STFT_SHIFT,
@@ -149,6 +151,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
             'features': Variable(torch.from_numpy(example['features'])),
             'seq_len': example['features'].shape[-1],
             'activity': example['activity'][:].astype(np.float32)
+            'activity_samples': example['activity_samples'][:].astype(np.float32)
         }
 
     dataset = dataset.map(finalize)
