@@ -99,6 +99,7 @@ def get_binary_classification(model_out, threshold):
     for prediction in model_out:
         smoothed_vad = smooth_vad(prediction, threshold=threshold)
         vad.append(smoothed_vad)
+    print(vad)
     return np.concatenate(vad, axis=-1).astype(np.bool)
 
 
