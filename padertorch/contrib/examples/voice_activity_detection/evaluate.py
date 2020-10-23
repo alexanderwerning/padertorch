@@ -91,7 +91,6 @@ def get_model_output(ex, model, per_sample, db):
         else:
             stop = BUFFER_SIZE + ex['num_samples'] - cumulated_samples
             predictions[i] = prediction[BUFFER_SIZE:stop]
-    print(list(map(lambda x: x.shape, predictions)))
     return predictions
 
 
@@ -100,7 +99,7 @@ def get_binary_classification(model_out, threshold):
     for prediction in model_out:
         smoothed_vad = smooth_vad(prediction, threshold=threshold)
         vad.append(smoothed_vad)
-    return np.concatenate(vad, axis=-1)
+    return np.concatenate(vad, axis=-1).astype(np.bool)
 
 
 @ex.automain
