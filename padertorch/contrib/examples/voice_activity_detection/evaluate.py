@@ -149,7 +149,6 @@ def get_model_output(ex, model, per_sample, db):
 def get_binary_classification(model_out, threshold):
     vad = list()
     for prediction in model_out:
-        print(prediction[:100])
         smoothed_vad = smooth_vad(prediction, threshold=threshold)
         vad.append(smoothed_vad)
     return np.concatenate(vad, axis=-1).astype(np.bool)
