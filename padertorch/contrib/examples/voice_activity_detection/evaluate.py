@@ -148,7 +148,6 @@ def get_model_output(ex, model, per_sample, db):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-        print(model_out_org[:100])
         if per_sample:
             model_out = activity_frequency_to_time(
                                                 model_out_org,
@@ -179,6 +178,7 @@ def get_model_output(ex, model, per_sample, db):
 def get_binary_classification(model_out, threshold):
     vad = list()
     for prediction in model_out:
+        print(prediction[:100])
         smoothed_vad = smooth_vad(prediction, threshold=threshold)
         vad.append(smoothed_vad)
     return np.concatenate(vad, axis=-1).astype(np.bool)
