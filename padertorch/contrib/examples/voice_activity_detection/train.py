@@ -52,11 +52,11 @@ def get_datasets():
 def chunker(example):
     """Cut out a random 4s segment from the stream for training."""
     # 4s at 8kHz -> 32k samples
-    chunk_length = 4 * SAMPLE_RATE + 2*BUFFER_SIZE
-    start = max(0, np.random.randint(example['num_samples'])-chunk_length)-BUFFER_SIZE
+    chunk_length = 4 * SAMPLE_RATE
+    start = max(0, np.random.randint(example['num_samples'])-chunk_length)
     stop = start + chunk_length
-    example.update(audio_start_samples=start)
-    example.update(audio_stop_samples=stop)
+    example.update(audio_start_samples=start-BUFFER_SIZE)
+    example.update(audio_stop_samples=stop+BUFFER_SIZE)
     example.update(audio_path=example['audio_path'])
     example.update(activity=example['activity'][start:stop])
     return example
