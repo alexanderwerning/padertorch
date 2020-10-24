@@ -30,31 +30,11 @@ def activity_frequency_to_time(
         stft_fading,
         time_length=None,
 ):
-    """
-
-    >>> from paderbox.transform import istft
-    >>> vad = np.array(   [0, 1, 0, 1, 0, 0, 1, 0, 0])
-    >>> np.set_printoptions(suppress=True)
-    >>> activity_frequency_to_time(vad, stft_window_length=4, stft_shift=2, stft_fading=False)
-    array([False, False,  True,  True,  True,  True,  True,  True,  True,
-            True, False, False,  True,  True,  True,  True, False, False,
-           False, False])
-    >>> activity_frequency_to_time([vad, vad], stft_window_length=4, stft_shift=2, stft_fading=False)
-    array([[False, False,  True,  True,  True,  True,  True,  True,  True,
-             True, False, False,  True,  True,  True,  True, False, False,
-            False, False],
-           [False, False,  True,  True,  True,  True,  True,  True,  True,
-             True, False, False,  True,  True,  True,  True, False, False,
-            False, False]])
-
-    """
     if stft_fading:
         raise NotImplementedError(stft_fading)
 
     frequency_activity = np.asarray(frequency_activity)
-    # import from paderbox.transform import istft
-    # cbj.istft
-    # frequency_activity = frequency_activity
+    
     frequency_activity = np.broadcast_to(
         frequency_activity[..., None], (*frequency_activity.shape, stft_window_length)
     )
@@ -69,16 +49,7 @@ def activity_frequency_to_time(
         time_activity, stft_window_length, stft_shift, end=None
     )
 
-    # Unbuffered inplace add
-    # np.add.at(
-    #     time_signal_seg,
-    #     ...,
-    #     frequency_activity
-    # )
-    # It is not nessesary to do a unbuffered assignment, because it is alwais
-    # the same value that gets assigned.
-    time_signal_seg = frequency_activity
-    time_activity = time_activity
+    time_signal_seg[:] = frequency_activity
 
     if time_length is not None:
         if time_length == time_activity.shape[-1]:
