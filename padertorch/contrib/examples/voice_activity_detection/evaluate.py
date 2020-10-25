@@ -137,9 +137,8 @@ def get_model_output(ex, model, per_sample, db):
                 predictions[i] = prediction[:-STFT_SHIFT//2]
                 cumulated_samples += predictions[i].shape[0]
             else:
-                stop =  ex['num_samples'] - cumulated_samples
+                stop = ex['num_samples'] - cumulated_samples
                 predictions[i] = prediction[:stop]
-    print(list(map(lambda x: x.shape, predictions)))
     return predictions
 
 
