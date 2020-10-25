@@ -144,8 +144,8 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
         buffer_size = BUFFER_SIZE//STFT_SHIFT
         overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-        buffer_front = buffer_size-max(0, int(overlap))
-        buffer_back = buffer_size-max(0, int(math.ceil(overlap)))
+        buffer_front = buffer_size-max(0, int(overlap)-2)
+        buffer_back = buffer_size-max(0, int(math.ceil(overlap))-2)
         example['features'] = features[..., buffer_front:-buffer_back]
         #example['features'] = features[..., :-STFT_SHIFT//2]
         example['activity_samples'] = example['activity'][:]
