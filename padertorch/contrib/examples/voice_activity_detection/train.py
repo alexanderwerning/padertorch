@@ -163,7 +163,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
             'example_id': example['example_id'],
             'features': Variable(torch.from_numpy(example['features'])),
             'seq_len': example['features'].shape[-1],
-            'activity': example['activity'][:].astype(np.bool),
+            'activity': example['activity'][:].astype(np.float32),
             'activity_samples': example['activity_samples'][:].astype(np.float32)
         }
 
