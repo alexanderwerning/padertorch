@@ -140,6 +140,7 @@ def get_model_output(ex, model, per_sample, db):
                 stop =  ex['num_samples'] - cumulated_samples
                 predictions[i] = prediction[:stop]
     print(list(map(lambda x: x.shape, predictions)))
+    print(ex['activity'].shape)
     return predictions
 
 
@@ -165,7 +166,6 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
 
     def get_target_fn(ex, per_sample):
         per_sample_vad = db.get_activity(ex)[:]
-        print(per_sample_vad.shape)
         if per_sample:
             return per_sample_vad
         per_frame_vad = segment_axis(per_sample_vad,
