@@ -139,6 +139,7 @@ def get_model_output(ex, model, per_sample, db):
             else:
                 stop =  ex['num_samples'] - cumulated_samples
                 predictions[i] = prediction[:stop]
+    print(predictions)
     return predictions
 
 
@@ -164,6 +165,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
 
     def get_target_fn(ex, per_sample):
         per_sample_vad = db.get_activity(ex)[:]
+        print(per_sample_vad)
         if per_sample:
             return per_sample_vad
         per_frame_vad = segment_axis(per_sample_vad,
