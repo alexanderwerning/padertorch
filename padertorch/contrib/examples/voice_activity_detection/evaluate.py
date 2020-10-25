@@ -134,7 +134,7 @@ def get_model_output(ex, model, per_sample, db):
 
         for i, prediction in enumerate(predictions):
             if i < len(predictions)-1:
-                predictions[i] = prediction[:]
+                predictions[i] = prediction[:-STFT_SHIFT//2]]
                 cumulated_samples += predictions[i].shape[0]
             else:
                 stop =  ex['num_samples'] - cumulated_samples
