@@ -105,6 +105,8 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         ex['audio_stop_samples'] += BUFFER_SIZE
         return ex
 
+    dataset = dataset.map(add_padding)
+
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
     )
