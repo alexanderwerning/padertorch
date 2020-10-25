@@ -139,7 +139,7 @@ def get_model_output(ex, model, per_sample, db):
             else:
                 stop =  ex['num_samples'] - cumulated_samples
                 predictions[i] = prediction[:stop]
-    print(list(map(lambda x: x.shape, predictions)
+    print(list(map(lambda x: x.shape, predictions))
     return predictions
 
 
