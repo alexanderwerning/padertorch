@@ -27,11 +27,8 @@ def activity_frequency_to_time(
         frequency_activity,
         stft_window_length,
         stft_shift,
-        stft_fading,
         time_length=None,
 ):
-    if stft_fading:
-        raise NotImplementedError(stft_fading)
 
     frequency_activity = np.asarray(frequency_activity)
     
@@ -95,8 +92,8 @@ def partition_audio(ex):
     stop = min(start + SEGMENT_LENGTH, num_samples)
 
     # stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
-    ex['audio_start_samples'] = start - BUFFER_SIZE
-    ex['audio_stop_samples'] = stop + BUFFER_SIZE
+    ex['audio_start_samples'] = start
+    ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
     return ex
 
@@ -123,26 +120,25 @@ def get_model_output(ex, model, per_sample, db):
             model_out = activity_frequency_to_time(
                                                 model_out_org,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
-                                                stft_shift=STFT_SHIFT,
-                                                stft_fading=None)
+                                                stft_shift=STFT_SHIFT)
         else:
             buffer_size = BUFFER_SIZE//STFT_SHIFT
             overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
             buffer_front = buffer_size-max(0, int(overlap)-1)
             buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
             model_out = model_out_org[:, buffer_front:-buffer_back]
-        
-        predictions.extend(model_out)
 
-    cumulated_samples = 0
-    
-    for i, prediction in enumerate(predictions):
-        if i < len(predictions)-1:
-            predictions[i] = prediction[BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
-            cumulated_samples += predictions[i].shape[0]
-        else:
-            stop = BUFFER_SIZE + ex['num_samples'] - cumulated_samples
-            predictions[i] = prediction[BUFFER_SIZE:stop]
+        predictions.extend(model_out)
+    if per_sample:
+        cumulated_samples = 0
+
+        for i, prediction in enumerate(predictions):
+            if i < len(predictions)-1:
+                predictions[i] = prediction[BUFFER_SIZE:-BUFFER_SIZE-STFT_SHIFT//2]
+                cumulated_samples += predictions[i].shape[0]
+            else:
+                stop = BUFFER_SIZE + ex['num_samples'] - cumulated_samples
+                predictions[i] = prediction[BUFFER_SIZE:stop]
     return predictions
 
 
