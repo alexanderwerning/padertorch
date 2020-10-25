@@ -140,11 +140,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
         features = rearrange(real_magnitude[None, None, ...],
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
-        buffer_size = BUFFER_SIZE
-        overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-        buffer_front = buffer_size-max(0, int(overlap)-1)
-        buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
-        example['features'] = features#[..., buffer_front:-buffer_back]
+        example['features'] = features[..., :-STFT_SHIFT//2]]
         example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'],
                                            length=STFT_WINDOW_LENGTH,
