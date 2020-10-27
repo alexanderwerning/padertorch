@@ -96,7 +96,9 @@ def partition_audio(ex):
     if stop > num_samples:
         pad = stop - num_samples
         stop = num_samples
-    ex['activity'] = np.concatenate(ex['activity'][start:stop], np.zeros(pad))
+        ex['activity'] = np.concatenate(ex['activity'][start:stop], np.zeros(pad))
+    else:
+        ex['activity'][start:stop]
     return ex
 
 
