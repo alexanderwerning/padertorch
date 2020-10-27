@@ -142,11 +142,15 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
         features = rearrange(real_magnitude[None, None, ...],
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
-        buffer_size = BUFFER_SIZE//STFT_SHIFT
-        overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-        buffer_front = buffer_size-max(0, int(overlap)-2)
-        buffer_back = buffer_size-max(0, int(overlap)-2)
-        example['features'] = features[..., buffer_front:-buffer_back]
+        # buffer_size = BUFFER_SIZE//STFT_SHIFT
+        # overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
+        # buffer_front = buffer_size-max(0, int(overlap)-2)
+        # buffer_back = buffer_size-max(0, int(overlap)-2)
+        with_buffer_per_sample = activity_frequency_to_time(
+                                                features,
+                                                stft_window_length=STFT_WINDOW_LENGTH,
+                                                stft_shift=STFT_SHIFT)
+        example['features'] = with_buffer_per_sample[..., BUFFER_SIZE:-BUFFER_SIZE]
         #example['features'] = features[..., :-STFT_SHIFT//2]
         example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'],
@@ -222,7 +226,6 @@ def main():
     if DATA_TEST:
         train_set, validate_set = get_datasets()
         element = train_set.__iter__().__next__()
-        # element['activity'] = element['activity']
         model = get_model()
         print(element['features'].shape, element['activity'].shape)
         output = model.forward(element)
