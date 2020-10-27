@@ -137,7 +137,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
         example['features'] = features
         example['activity_samples'] = example['activity'][:]
-        example['activity'] = segment_axis(example['activity'],
+        example['activity'] = segment_axis(example['activity'][:],
                                            length=STFT_WINDOW_LENGTH,
                                            shift=STFT_SHIFT,
                                            end='pad' if STFT_PAD else 'cut'
