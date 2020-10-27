@@ -149,13 +149,6 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
 
     dataset = dataset.map(audio_segmentation)
 
-    def add_padding(ex):
-        ex['audio_start_samples'] -= BUFFER_SIZE
-        ex['audio_stop_samples'] += BUFFER_SIZE
-        return ex
-
-    dataset = dataset.map(add_padding)
-
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
     )
@@ -191,16 +184,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
         features = rearrange(real_magnitude[None, None, ...],
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
-        buffer_size = BUFFER_SIZE//STFT_SHIFT
-        overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-        buffer_front = buffer_size-max(0, int(overlap)-2)
-        buffer_back = buffer_size-max(0, int(overlap)-2)
-        with_buffer_per_sample = activity_frequency_to_time(
-                                                features,
-                                                stft_window_length=STFT_WINDOW_LENGTH,
-                                                stft_shift=STFT_SHIFT)
-        example['features'] = with_buffer_per_sample[..., BUFFER_SIZE:example['num_samples']-BUFFER_SIZE]
-        #example['features'] = features[..., :-STFT_SHIFT//2]
+        example['features'] = features
         example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'],
                                            length=STFT_WINDOW_LENGTH,
