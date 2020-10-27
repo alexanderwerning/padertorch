@@ -120,7 +120,7 @@ def get_model_output(ex, model, per_sample, db):
                                                 model_out_org,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT)
-        model_out = with_buffer_per_sample[...,BUFFER_SIZE:ex['num_samples']+BUFFER_SIZE]
+        model_out = with_buffer_per_sample[...,BUFFER_SIZE:batch['num_samples']+BUFFER_SIZE]
         predictions.extend(model_out)
     return predictions
 
