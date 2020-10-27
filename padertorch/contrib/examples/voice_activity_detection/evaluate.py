@@ -94,9 +94,8 @@ def partition_audio(ex):
     ex['audio_start_samples'] = start - BUFFER_SIZE
     ex['audio_stop_samples'] = stop + BUFFER_SIZE
     if stop > num_samples:
-        pad = stop - num_samples
-        stop = num_samples
-        ex['activity'] = np.concatenate(ex['activity'][start:stop], np.zeros(pad))
+        ex['activity'] = np.zeros(stop-start)
+        ex['activity'][:stop-num_samples] = ex['activity'][start:num_samples]
     else:
         ex['activity'][start:stop]
     return ex
