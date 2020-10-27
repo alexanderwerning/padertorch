@@ -191,15 +191,15 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
         features = rearrange(real_magnitude[None, None, ...],
                              'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
-        # buffer_size = BUFFER_SIZE//STFT_SHIFT
-        # overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-        # buffer_front = buffer_size-max(0, int(overlap)-2)
-        # buffer_back = buffer_size-max(0, int(overlap)-2)
+        buffer_size = BUFFER_SIZE//STFT_SHIFT
+        overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
+        buffer_front = buffer_size-max(0, int(overlap)-2)
+        buffer_back = buffer_size-max(0, int(overlap)-2)
         with_buffer_per_sample = activity_frequency_to_time(
                                                 features,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT)
-        example['features'] = with_buffer_per_sample[..., BUFFER_SIZE:-BUFFER_SIZE]
+        example['features'] = with_buffer_per_sample[..., BUFFER_SIZE:example['num_samples']-BUFFER_SIZE]
         #example['features'] = features[..., :-STFT_SHIFT//2]
         example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'],
@@ -237,10 +237,14 @@ def get_model():
                   out_channels=2*[16] + 2*[32] + 2*[64],
                   kernel_size=3,
                   norm='batch',
+                  output_layer=False,
                   pool_size=[1, (4, 1)] + 2*[1, (8, 1)])
     temporal_layer = CNN1d(in_channels=64,
                            out_channels=[128, 10],
                            kernel_size=3,
+                           input_layer=False,
+                           norm='batch',
+                           output_layer=False,
                            pool_size=1)
     # we cannot pool across the channels using CNN1d
     pooling = MaxPool2d(kernel_size=(10, 1))

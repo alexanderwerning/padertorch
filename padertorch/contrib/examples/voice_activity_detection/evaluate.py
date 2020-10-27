@@ -23,9 +23,6 @@ BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
 TRAINED_MODEL = True
 
 
-
-
-
 @ex.config
 def config():
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
@@ -69,29 +66,7 @@ def get_model_output(ex, model, per_sample, db):
     dataset = get_data(ex)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
-    #     if per_sample:
-    #         model_out = activity_frequency_to_time(
-    #                                             model_out_org,
-    #                                             stft_window_length=STFT_WINDOW_LENGTH,
-    #                                             stft_shift=STFT_SHIFT)
-    # #     else:
-    #         buffer_size = BUFFER_SIZE//STFT_SHIFT
-    #         overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-    #         buffer_front = buffer_size-max(0, int(overlap)-1)
-    #         buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
-    #         model_out = model_out_org[:, buffer_front:-buffer_back]
-
         predictions.extend(model_out_org)
-    # if per_sample:
-    #     cumulated_samples = 0
-
-    #     for i, prediction in enumerate(predictions):
-    #         if i < len(predictions)-1:
-    #             predictions[i] = prediction[:-STFT_SHIFT//2]
-    #             cumulated_samples += predictions[i].shape[0]
-    #         else:
-    #             stop = ex['num_samples'] - cumulated_samples
-    #             predictions[i] = prediction[:stop]
     return predictions
 
 
