@@ -82,7 +82,6 @@ def config():
     subset = 'stream'
     ignore_buffer = False
     norm = False
-    per_sample = True
 
 
 def partition_audio(ex):
@@ -117,7 +116,7 @@ def get_data(ex):
     return prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
 
 
-def get_model_output(ex, model, per_sample, db):
+def get_model_output(ex, model, db):
     predictions = []
     sequence_lengths = []
     dataset = get_data(ex)
@@ -142,7 +141,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @ex.automain
-def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
+def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
 
@@ -153,25 +152,18 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
     db = Fearless()
     model.eval()
 
-    def get_target_fn(ex, per_sample):
+    def get_target_fn(ex):
         padded_length = SEGMENT_LENGTH*(math.ceil(ex['num_samples'] / SEGMENT_LENGTH))
         per_sample_vad = np.zeros(padded_length)
         per_sample_vad[:ex['num_samples']] = db.get_activity(ex)[:]
-        if per_sample:
-            return per_sample_vad
-        per_frame_vad = segment_axis(per_sample_vad,
-                                     length=STFT_WINDOW_LENGTH,
-                                     shift=STFT_SHIFT,
-                                     end='pad'
-                                     ).any(axis=-1)
-        return per_frame_vad
+        return per_sample_vad
 
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
-            lambda ex: get_model_output(ex, model, per_sample, db),
+            lambda ex: get_model_output(ex, model, db),
             lambda out, th, ex: get_binary_classification(out, th),
-            lambda ex: get_target_fn(ex, per_sample),
+            lambda ex: get_target_fn(ex),
             num_thresholds=num_ths,
             buffer_zone=buffer_zone
         )
