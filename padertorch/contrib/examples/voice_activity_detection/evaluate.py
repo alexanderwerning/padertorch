@@ -121,7 +121,7 @@ def get_model_output(ex, model, per_sample, db):
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT)
         model_out = with_buffer_per_sample[...,BUFFER_SIZE:ex['num_samples']+BUFFER_SIZE]
-        predictions.extend(model_out_org)
+        predictions.extend(model_out)
     return predictions
 
 
