@@ -89,11 +89,14 @@ def partition_audio(ex):
     num_samples = ex['num_samples']
     index = ex['index']
     start = index * SEGMENT_LENGTH
-    stop = min(start + SEGMENT_LENGTH, num_samples)
+    stop = start + SEGMENT_LENGTH
 
     ex['audio_start_samples'] = start - BUFFER_SIZE
     ex['audio_stop_samples'] = stop + BUFFER_SIZE
-    ex['activity'] = ex['activity'][start:stop]
+    if stop > num_samples:
+        pad = stop - num_samples
+        stop = num_samples
+    ex['activity'] = np.concatenate(ex['activity'][start:stop], np.zeros(pad))
     return ex
 
 
@@ -120,7 +123,7 @@ def get_model_output(ex, model, per_sample, db):
                                                 model_out_org,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT)
-        model_out = with_buffer_per_sample[..., BUFFER_SIZE:batch['seq_len'][0]+BUFFER_SIZE]
+        model_out = with_buffer_per_sample[..., BUFFER_SIZE:SEGMENT_LENGTH+BUFFER_SIZE]
         predictions.extend(model_out)
     return predictions
 
