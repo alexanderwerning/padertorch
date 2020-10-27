@@ -22,6 +22,7 @@ SEGMENT_LENGTH = SAMPLE_RATE * 60
 BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
 TRAINED_MODEL = True
 
+
 # adapted from padercontrib.database.chime5.database
 def activity_frequency_to_time(
         frequency_activity,
@@ -31,7 +32,7 @@ def activity_frequency_to_time(
 ):
 
     frequency_activity = np.asarray(frequency_activity)
-    
+
     frequency_activity = np.broadcast_to(
         frequency_activity[..., None], (*frequency_activity.shape, stft_window_length)
     )
@@ -91,7 +92,6 @@ def partition_audio(ex):
     start = index * SEGMENT_LENGTH
     stop = min(start + SEGMENT_LENGTH, num_samples)
 
-    # stop = min((index+1) * SEGMENT_LENGTH+0*STFT_SHIFT, num_samples)
     ex['audio_start_samples'] = start
     ex['audio_stop_samples'] = stop
     ex['activity'] = ex['activity'][start:stop]
@@ -121,24 +121,24 @@ def get_model_output(ex, model, per_sample, db):
                                                 model_out_org,
                                                 stft_window_length=STFT_WINDOW_LENGTH,
                                                 stft_shift=STFT_SHIFT)
-        else:
-            buffer_size = BUFFER_SIZE//STFT_SHIFT
-            overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
-            buffer_front = buffer_size-max(0, int(overlap)-1)
-            buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
-            model_out = model_out_org[:, buffer_front:-buffer_back]
+    #     else:
+    #         buffer_size = BUFFER_SIZE//STFT_SHIFT
+    #         overlap = STFT_WINDOW_LENGTH/STFT_SHIFT/2
+    #         buffer_front = buffer_size-max(0, int(overlap)-1)
+    #         buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
+    #         model_out = model_out_org[:, buffer_front:-buffer_back]
 
-        predictions.extend(model_out)
-    if per_sample:
-        cumulated_samples = 0
+    #     predictions.extend(model_out)
+    # if per_sample:
+    #     cumulated_samples = 0
 
-        for i, prediction in enumerate(predictions):
-            if i < len(predictions)-1:
-                predictions[i] = prediction[:-STFT_SHIFT//2]
-                cumulated_samples += predictions[i].shape[0]
-            else:
-                stop = ex['num_samples'] - cumulated_samples
-                predictions[i] = prediction[:stop]
+    #     for i, prediction in enumerate(predictions):
+    #         if i < len(predictions)-1:
+    #             predictions[i] = prediction[:-STFT_SHIFT//2]
+    #             cumulated_samples += predictions[i].shape[0]
+    #         else:
+    #             stop = ex['num_samples'] - cumulated_samples
+    #             predictions[i] = prediction[:stop]
     return predictions
 
 
