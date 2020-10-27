@@ -128,7 +128,7 @@ def get_model_output(ex, model, per_sample, db):
     #         buffer_back = buffer_size-max(0, int(math.ceil(overlap))-1)
     #         model_out = model_out_org[:, buffer_front:-buffer_back]
 
-    #     predictions.extend(model_out)
+        predictions.extend(model_out)
     # if per_sample:
     #     cumulated_samples = 0
 
