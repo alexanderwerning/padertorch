@@ -99,7 +99,7 @@ def partition_audio(ex):
         activity[:activity_length] = ex['activity'][start:]
         ex['activity'] = activity
     else:
-        ex['activity'][start:stop]
+        ex['activity'] = ex['activity'][start:stop]
     assert ex['activity'].shape[0] == SEGMENT_LENGTH, (ex['activity'].shape[0], SEGMENT_LENGTH)
     return ex
 
