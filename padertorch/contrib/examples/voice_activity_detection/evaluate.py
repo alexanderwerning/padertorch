@@ -155,7 +155,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, per_sample):
 
     def get_target_fn(ex, per_sample):
         #per_sample_vad = db.get_activity(ex)[:]
-        padded_length = SEGMENT_LENGTH*(math.ceil(ex['num_samples'] / SEGMENT_LENGTH)
+        padded_length = SEGMENT_LENGTH*(math.ceil(ex['num_samples'] / SEGMENT_LENGTH))
         per_sample_vad = np.zeros(padded_length)
         per_sample_vad[:ex['num_samples']] = ex['activity']
     else:
