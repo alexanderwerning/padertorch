@@ -91,7 +91,6 @@ def config():
         "stop_trigger": (50000, "iteration") if not debug else (5000, "iteration"),
 
     }
-    Trainer.get_config(trainer)
 
     experiment.observers.append(FileStorageObserver(
         Path(trainer['storage_dir']) / 'sacred')
