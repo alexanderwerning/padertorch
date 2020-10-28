@@ -44,13 +44,14 @@ def config():
     data_test = False
     debug = False
     batch_size = 8
+    batches_buffer = 4
     chunk_size = 4 * SAMPLE_RATE
 
     data_subset = "stream"
 
     load_model_from = None
 
-    trainer = {
+    trainer_config = {
         "model": {
             "factory": SAD_Classifier,
             "conv_layer": {
