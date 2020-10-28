@@ -171,14 +171,14 @@ def get_model():
                   out_channels=2*[16] + 2*[32] + 2*[64],
                   kernel_size=3,
                   norm='batch',
-                  #output_layer=False,
+                  output_layer=False,
                   pool_size=[1, (4, 1)] + 2*[1, (8, 1)])
     temporal_layer = CNN1d(in_channels=64,
                            out_channels=[128, 10],
                            kernel_size=3,
-                           #input_layer=False,
-                           #norm='batch',
-                           #output_layer=False,
+                           input_layer=False,
+                           norm='batch',
+                           output_layer=False,
                            pool_size=1)
     # we cannot pool across the channels using CNN1d
     pooling = MaxPool2d(kernel_size=(10, 1))
