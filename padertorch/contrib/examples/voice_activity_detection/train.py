@@ -89,8 +89,8 @@ def config():
         "summary_trigger": (100, "iteration"),
         "checkpoint_trigger": (1000, "iteration"),
         "stop_trigger": (50000, "iteration") if not debug else (5000, "iteration"),
-
     }
+    Trainer.get_config(trainer_config)
 
     experiment.observers.append(FileStorageObserver(
         Path(trainer_config['storage_dir']) / 'sacred')
