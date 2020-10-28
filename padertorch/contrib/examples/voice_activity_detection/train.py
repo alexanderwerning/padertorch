@@ -10,8 +10,10 @@ export STORAGE_ROOT=<your desired storage root>
 python -m padertorch.contrib.examples.voice_activity_detection.train
 """
 import os
-import math
 from pathlib import Path
+
+from sacred import Experiment
+from sacred.observers.file_storage import FileStorageObserver
 
 import numpy as np
 from paderbox.utils.timer import timeStamped
@@ -19,9 +21,8 @@ from paderbox.transform.module_stft import STFT
 from padercontrib.database.fearless import Fearless
 from padertorch import Trainer
 from padertorch.contrib.examples.voice_activity_detection.model import SAD_Classifier
-from padertorch.contrib.je.data.transforms import AudioReader, Normalizer, Collate
+from padertorch.contrib.je.data.transforms import AudioReader, Collate
 from padertorch.contrib.je.modules.conv import CNN1d, CNN2d
-from padertorch.modules.fully_connected import fully_connected_stack
 from padertorch.train.optimizer import Adam
 import torch
 from torch.nn import MaxPool2d
@@ -29,32 +30,87 @@ from torch.autograd import Variable
 from paderbox.array import segment_axis
 from einops import rearrange
 
-DEBUG = False
-DATA_TEST = False
-
 STFT_SHIFT = 80
 STFT_WINDOW_LENGTH = 200
 STFT_SIZE = 256
 STFT_PAD = True
 SAMPLE_RATE = 8000
 
+experiment_name = "sad"
+experiment = Experiment(experiment_name)
 
-def get_datasets():
+@experiment.config
+def config():
+    data_test = False
+    debug = False
+    batch_size = 8
+    chunk_size = 4 * SAMPLE_RATE
+
+    data_subset = "stream"
+
+    load_model_from = None
+
+    trainer = {
+        "model": {
+            "factory": SAD_Classifier,
+            "conv_layer": {
+                "factory": CNN2d,
+                "in_channels": 1,
+                "out_channels": 2*[16] + 2*[32] + 2*[64],
+                "kernel_size": 3,
+                "norm": 'batch',
+                "output_layer": False,
+                "pool_size": [1, (4, 1)] + 2*[1, (8, 1)]
+            },
+            "temporal_layer": {
+                "factory": CNN1d,
+                "in_channels": 64,
+                "out_channels": [128, 10],
+                "kernel_size": 3,
+                "input_layer": False,
+                "norm": 'batch',
+                "output_layer": False,
+                "pool_size": 1
+            },
+            "pooling": {
+                "factory": MaxPool2d,
+                "kernel_size": (10, 1)
+            },
+            "activation": {
+                "factory": torch.nn.Sigmoid
+            }
+        },
+        "storage_dir": str(Path(os.environ['STORAGE_ROOT']) / 'voice_activity' / timeStamped('')[1:]),
+        "optimizer": {
+            "factory": Adam,
+            "lr": 1e-3
+        },
+        "summary_trigger": (100, "iteration"),
+        "checkpoint_trigger": (1000, "iteration"),
+        "stop_trigger": (50000, "iteration") if not debug else (5000, "iteration"),
+
+    }
+    Trainer.get_config(trainer)
+
+    experiment.observers.append(FileStorageObserver(
+        Path(trainer['storage_dir']) / 'sacred')
+    )
+
+
+def get_datasets(subset, chunk_size, batch_size, batches_buffer):
     db = Fearless()
-    train = db.get_dataset_train(subset='stream')
-    validate = db.get_dataset_validation(subset='stream')
+    train_set = db.get_dataset_train(subset=subset)
+    validate_set = db.get_dataset_validation(subset=subset)
 
-    training_data = prepare_dataset(train, chunker, shuffle=True)
-    validation_data = prepare_dataset(validate, select_speech, batch_size=2, buffer_factor=2, num_workers=2)
+    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size), shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
+    validation_data = prepare_dataset(validate_set, select_speech, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
     return training_data, validation_data
 
 
-def chunker(example):
+def chunker(example, chunk_size):
     """Cut out a random 4s segment from the stream for training."""
-    # 4s at 8kHz -> 32k samples
-    chunk_length = 4 * SAMPLE_RATE
-    start = max(0, np.random.randint(example['num_samples'])-chunk_length)
-    stop = start + chunk_length
+    start = max(0, np.random.randint(example['num_samples'])-chunk_size)
+    stop = start + chunk_size
     example.update(audio_start_samples=start)
     example.update(audio_stop_samples=stop)
     example.update(audio_path=example['audio_path'])
@@ -79,7 +135,7 @@ def select_speech(example):
     return example
 
 
-def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, buffer_factor=4, num_workers=8):
+def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, batches_buffer=4, num_workers=8):
     db = Fearless()
 
     def prepare_example(example):
@@ -92,7 +148,7 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
     if shuffle:
         dataset = dataset.shuffle(reshuffle=True)
 
-    buffer_size = int(buffer_factor * batch_size)
+    buffer_size = int(batches_buffer * batch_size)
     dataset = dataset.prefetch(
         num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
     )
@@ -166,65 +222,42 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, bu
     return dataset
 
 
-def get_model():
-    cnn2d = CNN2d(in_channels=1,
-                  out_channels=2*[16] + 2*[32] + 2*[64],
-                  kernel_size=3,
-                  norm='batch',
-                  output_layer=False,
-                  pool_size=[1, (4, 1)] + 2*[1, (8, 1)])
-    temporal_layer = CNN1d(in_channels=64,
-                           out_channels=[128, 10],
-                           kernel_size=3,
-                           input_layer=False,
-                           norm='batch',
-                           output_layer=False,
-                           pool_size=1)
-    # we cannot pool across the channels using CNN1d
-    pooling = MaxPool2d(kernel_size=(10, 1))
-    sigmoid = torch.nn.Sigmoid()
-    model = SAD_Classifier(cnn2d, temporal_layer, pooling, sigmoid)
-    return model
+def get_trainer(trainer_config, load_model_from):
+    trainer = Trainer.from_config(trainer_config)
+
+    checkpoint_path = trainer.checkpoint_dir / 'ckpt_latest.pth'
+    if load_model_from is not None and not checkpoint_path.is_file():
+        _log.info(f'Loading model weights from {load_model_from}')
+        checkpoint = torch.load(load_model_from)
+        trainer.model.load_state_dict(checkpoint['model'])
+
+    return trainer
 
 
-def train(model, storage_dir):
-    train_set, validate_set = get_datasets()
-    stop_trigger = 50000
-    if DEBUG:
-        stop_trigger = 5000
-    trainer = Trainer(
-        model=model,
-        optimizer=Adam(lr=1e-3),
-        storage_dir=str(storage_dir),
-        summary_trigger=(100, 'iteration'),
-        checkpoint_trigger=(1000, 'iteration'),
-        stop_trigger=(stop_trigger, 'iteration')
-    )
+def train(trainer_config, train_set, validate_set, load_model_from):
+    trainer = get_trainer(trainer_config, load_model_from)
     trainer.register_validation_hook(validate_set)
     trainer.test_run(train_set, validate_set)
     trainer.train(train_set)
 
 
-def main():
-    storage_dir = str(
-    Path(os.environ['STORAGE_ROOT']) / 'voice_activity' / timeStamped('')[1:]
-    )
-    os.makedirs(storage_dir, exist_ok=True)
-    if DATA_TEST:
-        train_set, validate_set = get_datasets()
-        element = train_set.__iter__().__next__()
-        model = get_model()
-        print(element['features'].shape, element['activity'].shape)
-        output = model.forward(element)
-        print(output.shape)
-        print(model.review(element, output))
-        element = validate_set.__iter__().__next__()
-        output = model.forward(element)
-        print(output.shape, element['activity'].shape)
+@experiment.automain
+def main(trainer_config, data_test, batch_size, chunk_size, batches_buffer, data_subset, load_model_from):
+
+    os.makedirs(trainer_config['storage_dir'], exist_ok=True)
+    if data_test:
+        # train_set, validate_set = get_datasets(data_subset, chunk_size, batch_size, batches_buffer)
+        # element = train_set.__iter__().__next__()
+        # model = get_model()
+        # print(element['features'].shape, element['activity'].shape)
+        # output = model.forward(element)
+        # print(output.shape)
+        # print(model.review(element, output))
+        # element = validate_set.__iter__().__next__()
+        # output = model.forward(element)
+        # print(output.shape, element['activity'].shape)
+        pass
     else:
-        model = get_model()
-        train(model, storage_dir)
+        train_set, validate_set = get_datasets(data_subset, chunk_size, batch_size, batches_buffer)
+        train(trainer_config, train_set, validate_set, load_model_from)
 
-
-if __name__ == '__main__':
-    main()
