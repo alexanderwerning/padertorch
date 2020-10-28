@@ -93,7 +93,7 @@ def config():
     }
 
     experiment.observers.append(FileStorageObserver(
-        Path(trainer['storage_dir']) / 'sacred')
+        Path(trainer_config['storage_dir']) / 'sacred')
     )
 
 
