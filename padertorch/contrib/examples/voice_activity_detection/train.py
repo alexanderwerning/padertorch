@@ -44,8 +44,8 @@ def get_datasets():
     train = db.get_dataset_train(subset='stream')
     validate = db.get_dataset_validation(subset='stream')
 
-    training_data = prepare_dataset(train, chunker, shuffle=True, buffer_factor=2)
-    validation_data = prepare_dataset(validate, select_speech, shuffle=False, buffer_factor=2)
+    training_data = prepare_dataset(train, chunker, shuffle=True)
+    validation_data = prepare_dataset(validate, select_speech, batch_size=2, buffer_factor=2, num_workers=2)
     return training_data, validation_data
 
 
