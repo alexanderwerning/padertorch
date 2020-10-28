@@ -45,7 +45,8 @@ def config():
     debug = False
     batch_size = 8
     batches_buffer = 4
-    chunk_size = 4 * SAMPLE_RATE
+    train_chunk_size = 4 * SAMPLE_RATE
+    validate_chunk_size = 30 * SAMPLE_RATE
 
     data_subset = "stream"
 
@@ -97,17 +98,17 @@ def config():
     )
 
 
-def get_datasets(subset, chunk_size, batch_size, batches_buffer):
+def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer):
     db = Fearless()
     train_set = db.get_dataset_train(subset=subset)
     validate_set = db.get_dataset_validation(subset=subset)
 
-    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size), shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
-    validation_data = prepare_dataset(validate_set, select_speech, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
+    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, train_chunk_size=train_chunk_size), shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
+    validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, validate_chunk_size=validate_chunk_size), batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
     return training_data, validation_data
 
 
-def chunker(example, chunk_size):
+def chunker(example, train_chunk):
     """Cut out a random 4s segment from the stream for training."""
     start = max(0, np.random.randint(example['num_samples'])-chunk_size)
     stop = start + chunk_size
@@ -118,7 +119,7 @@ def chunker(example, chunk_size):
     return example
 
 
-def select_speech(example):
+def select_speech(example, validate_chunk=30*8000):
     """Cut out a section with speech for evaluation.
 
     We evaluate the model on 30s audio segments which contain speech.
@@ -126,9 +127,8 @@ def select_speech(example):
     first_speech = example['activity'].intervals[0][0]
     max_time_buffer = 8000 * 1 # 1s
     time_buffer = np.random.randint(max_time_buffer)
-    length = 8000 * 30  # 30s
     start = max(0, first_speech-time_buffer)
-    stop = start + length
+    stop = start + validate_chunk
     example['audio_start_samples'] = start
     example['audio_stop_samples'] = stop
     example['activity'] = example['activity'][start:stop]
@@ -242,7 +242,7 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 
 
 @experiment.automain
-def main(trainer_config, data_test, batch_size, chunk_size, batches_buffer, data_subset, load_model_from):
+def main(trainer_config, data_test, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from):
 
     os.makedirs(trainer_config['storage_dir'], exist_ok=True)
     if data_test:
@@ -258,6 +258,6 @@ def main(trainer_config, data_test, batch_size, chunk_size, batches_buffer, data
         # print(output.shape, element['activity'].shape)
         pass
     else:
-        train_set, validate_set = get_datasets(data_subset, chunk_size, batch_size, batches_buffer)
+        train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer)
         train(trainer_config, train_set, validate_set, load_model_from)
 
