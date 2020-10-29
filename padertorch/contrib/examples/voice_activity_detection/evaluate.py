@@ -145,7 +145,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
         model_config = get_model_config()
     model = Configurable.from_config(model_config)
     if TRAINED_MODEL:
-        state_dict = torch.load(Path(model_dir/'ckpt_latest.pth'))['model']
+        state_dict = torch.load(Path(model_dir/'checkpoints'/'ckpt_latest.pth'))['model']
         model.load_state_dict(state_dict)
     db = Fearless()
     model.eval()
