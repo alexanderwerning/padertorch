@@ -172,7 +172,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
         else:
             out_dir = Path(out_dir).expanduser().resolve()
         if TRAINED_MODEL:
-            model_name = Path(model_dir).parent.stem
+            model_name = Path(model_dir).stem
             output_file = out_dir / f'stats_fearless_{model_name}_{buffer_zone}.txt'
         else:
             output_file = out_dir / f'stats_fearless_{buffer_zone}_no_train.txt'
