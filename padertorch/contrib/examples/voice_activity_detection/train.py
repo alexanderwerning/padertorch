@@ -1,8 +1,3 @@
-#dataset iterator
-#map pre-batch operations, stft etc
-# chunker
-#shuffle
-# batch(batch_size)
 """
 Example call:
 
@@ -41,7 +36,6 @@ experiment = Experiment(experiment_name)
 
 @experiment.config
 def config():
-    data_test = False
     debug = False
     batch_size = 8
     batches_buffer = 4
@@ -227,7 +221,7 @@ def get_trainer(trainer_config, load_model_from):
 
     checkpoint_path = trainer.checkpoint_dir / 'ckpt_latest.pth'
     if load_model_from is not None and not checkpoint_path.is_file():
-        _log.info(f'Loading model weights from {load_model_from}')
+        #_log.info(f'Loading model weights from {load_model_from}')
         checkpoint = torch.load(load_model_from)
         trainer.model.load_state_dict(checkpoint['model'])
 
@@ -242,22 +236,9 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 
 
 @experiment.automain
-def main(trainer_config, data_test, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from):
+def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from):
 
     os.makedirs(trainer_config['storage_dir'], exist_ok=True)
-    if data_test:
-        # train_set, validate_set = get_datasets(data_subset, chunk_size, batch_size, batches_buffer)
-        # element = train_set.__iter__().__next__()
-        # model = get_model()
-        # print(element['features'].shape, element['activity'].shape)
-        # output = model.forward(element)
-        # print(output.shape)
-        # print(model.review(element, output))
-        # element = validate_set.__iter__().__next__()
-        # output = model.forward(element)
-        # print(output.shape, element['activity'].shape)
-        pass
-    else:
-        train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer)
-        train(trainer_config, train_set, validate_set, load_model_from)
+    train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer)
+    train(trainer_config, train_set, validate_set, load_model_from)
 
