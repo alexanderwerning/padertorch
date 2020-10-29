@@ -8,9 +8,11 @@ import torch
 import lazy_dataset
 from paderbox.array import segment_axis
 from padercontrib.database.fearless import Fearless
+from padertorch.configurable import Configurable
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
-from padertorch.contrib.examples.voice_activity_detection.train import get_model
+from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
 from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
+
 
 ex = sacred.Experiment('VAD Evaluation')
 
@@ -136,8 +138,12 @@ def get_binary_classification(model_out, threshold):
 def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
-
-    model = get_model()
+    model_file = (model_dir/"model.json")
+    if model_file.exists():
+        model_config = json.loads(model_file.read_text())
+    else:
+        model_config = get_model_config()
+    model = Configurable.from_config(model_config)
     if TRAINED_MODEL:
         state_dict = torch.load(Path(model_dir/'ckpt_latest.pth'))['model']
         model.load_state_dict(state_dict)

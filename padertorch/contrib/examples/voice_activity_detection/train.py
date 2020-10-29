@@ -4,6 +4,7 @@ Example call:
 export STORAGE_ROOT=<your desired storage root>
 python -m padertorch.contrib.examples.voice_activity_detection.train
 """
+import json
 import os
 from pathlib import Path
 
@@ -34,6 +35,37 @@ SAMPLE_RATE = 8000
 experiment_name = "sad"
 experiment = Experiment(experiment_name)
 
+def get_model_config():
+    return {
+        "factory": SAD_Classifier,
+        "conv_layer": {
+            "factory": CNN2d,
+            "in_channels": 1,
+            "out_channels": 2*[16] + 2*[32] + 2*[64],
+            "kernel_size": 3,
+            "norm": 'batch',
+            "output_layer": False,
+            "pool_size": [1, (4, 1)] + 2*[1, (8, 1)]
+        },
+        "temporal_layer": {
+            "factory": CNN1d,
+            "in_channels": 64,
+            "out_channels": [128, 10],
+            "kernel_size": 3,
+            "input_layer": False,
+            "norm": 'batch',
+            "output_layer": False,
+            "pool_size": 1
+        },
+        "pooling": {
+            "factory": MaxPool2d,
+            "kernel_size": (10, 1)
+        },
+        "activation": {
+            "factory": torch.nn.Sigmoid
+        }
+    }
+
 @experiment.config
 def config():
     debug = False
@@ -47,35 +79,7 @@ def config():
     load_model_from = None
 
     trainer_config = {
-        "model": {
-            "factory": SAD_Classifier,
-            "conv_layer": {
-                "factory": CNN2d,
-                "in_channels": 1,
-                "out_channels": 2*[16] + 2*[32] + 2*[64],
-                "kernel_size": 3,
-                "norm": 'batch',
-                "output_layer": False,
-                "pool_size": [1, (4, 1)] + 2*[1, (8, 1)]
-            },
-            "temporal_layer": {
-                "factory": CNN1d,
-                "in_channels": 64,
-                "out_channels": [128, 10],
-                "kernel_size": 3,
-                "input_layer": False,
-                "norm": 'batch',
-                "output_layer": False,
-                "pool_size": 1
-            },
-            "pooling": {
-                "factory": MaxPool2d,
-                "kernel_size": (10, 1)
-            },
-            "activation": {
-                "factory": torch.nn.Sigmoid
-            }
-        },
+        "model": get_model_config(),
         "storage_dir": str(Path(os.environ['STORAGE_ROOT']) / 'voice_activity' / timeStamped('')[1:]),
         "optimizer": {
             "factory": Adam,
@@ -237,8 +241,10 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 
 @experiment.automain
 def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from):
+    storage_dir = Path(trainer_config['storage_dir'])
+    os.makedirs(storage_dir, exist_ok=True)
+    model_file = storage_dir/'model.json'
+    model_file.write_text(json.dumps(trainer_config['model']))
 
-    os.makedirs(trainer_config['storage_dir'], exist_ok=True)
     train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer)
     train(trainer_config, train_set, validate_set, load_model_from)
-
