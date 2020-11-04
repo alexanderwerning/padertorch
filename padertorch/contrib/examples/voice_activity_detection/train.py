@@ -54,7 +54,7 @@ def get_model_config():
             "kernel_size": 3,
             "input_layer": False,
             "norm": 'batch',
-            "output_layer": False,
+            "output_layer": True,
             "pool_size": 1
         },
         "pooling": {
