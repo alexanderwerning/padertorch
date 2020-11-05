@@ -4,6 +4,7 @@ Example call:
 export STORAGE_ROOT=<your desired storage root>
 python -m padertorch.contrib.examples.voice_activity_detection.train
 """
+import random
 import json
 import os
 from pathlib import Path
@@ -126,8 +127,7 @@ def chunker(example, chunk_size):
         examples.append(example_chunk)
         start = stop
 
-    examples = np.random.shuffle(examples)
-
+    examples = random.shuffle(examples)
     return examples
 
 
