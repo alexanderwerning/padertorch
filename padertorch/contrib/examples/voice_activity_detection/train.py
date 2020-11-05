@@ -157,11 +157,6 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     if shuffle:
         dataset = dataset.shuffle(reshuffle=True)
 
-    buffer_size = int(batches_buffer * batch_size)
-    dataset = dataset.prefetch(
-        num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
-    )
-
     if train:
         dataset = dataset.map(audio_segmentation)
         dataset = dataset.unbatch()
@@ -233,6 +228,11 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     dataset = dataset.map(unpack_tensor)
 
+    buffer_size = int(batches_buffer * batch_size)
+    dataset = dataset.prefetch(
+        num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
+    )
+
     return dataset
 
 
@@ -248,7 +248,6 @@ def get_trainer(trainer_config, load_model_from):
 
 
 def train(trainer_config, train_set, validate_set, load_model_from):
-    print("Training set size:",len(train_set))
     trainer = get_trainer(trainer_config, load_model_from)
     trainer.register_validation_hook(validate_set)
     trainer.test_run(train_set, validate_set)
