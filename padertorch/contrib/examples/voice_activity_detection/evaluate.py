@@ -69,6 +69,14 @@ def activity_frequency_to_time(
 
 @ex.config
 def config():
+    STFT_SHIFT = 80
+    STFT_WINDOW_LENGTH = 200
+    STFT_SIZE = 256
+    SAMPLE_RATE = 8000
+    SEGMENT_LENGTH = SAMPLE_RATE * 60
+    BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
+    TRAINED_MODEL = True
+
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
     out_dir = '/home/awerning/out'
     num_ths = 201
@@ -77,13 +85,6 @@ def config():
     subset = 'stream'
     ignore_buffer = False
     norm = False
-    STFT_SHIFT = 80
-    STFT_WINDOW_LENGTH = 200
-    STFT_SIZE = 256
-    SAMPLE_RATE = 8000
-    SEGMENT_LENGTH = SAMPLE_RATE * 60
-    BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
-    TRAINED_MODEL = True
 
 
 def partition_audio(ex):

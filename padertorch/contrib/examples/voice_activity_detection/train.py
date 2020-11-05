@@ -62,17 +62,17 @@ def get_model_config():
 
 @experiment.config
 def config():
-    debug = False
-    batch_size = 8
-    batches_buffer = 4
-    train_chunk_size = 4 * SAMPLE_RATE
-    validate_chunk_size = 30 * SAMPLE_RATE
-
     STFT_SHIFT = 80
     STFT_WINDOW_LENGTH = 200
     STFT_SIZE = 256
     STFT_PAD = True
     SAMPLE_RATE = 8000
+
+    debug = False
+    batch_size = 8
+    batches_buffer = 4
+    train_chunk_size = 4 * SAMPLE_RATE
+    validate_chunk_size = 30 * SAMPLE_RATE
 
     data_subset = "stream"
 
