@@ -165,9 +165,6 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         dataset = dataset.unbatch()
 
     buffer_size = int(batches_buffer * batch_size)
-    dataset = dataset.prefetch(
-        num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
-    )
 
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
