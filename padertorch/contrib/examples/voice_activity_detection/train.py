@@ -228,7 +228,6 @@ def get_trainer(trainer_config, load_model_from):
 
     checkpoint_path = trainer.checkpoint_dir / 'ckpt_latest.pth'
     if load_model_from is not None and not checkpoint_path.is_file():
-        #_log.info(f'Loading model weights from {load_model_from}')
         checkpoint = torch.load(load_model_from)
         trainer.model.load_state_dict(checkpoint['model'])
 
@@ -236,7 +235,7 @@ def get_trainer(trainer_config, load_model_from):
 
 
 def train(trainer_config, train_set, validate_set, load_model_from):
-    print("Training set size:",len(train_set))
+
     trainer = get_trainer(trainer_config, load_model_from)
     trainer.register_validation_hook(validate_set)
     trainer.test_run(train_set, validate_set)
@@ -251,4 +250,5 @@ def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batc
     model_file.write_text(json.dumps(trainer_config['model']))
 
     train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
+    print("Training set size:",len(train_set))
     train(trainer_config, train_set, validate_set, load_model_from)
