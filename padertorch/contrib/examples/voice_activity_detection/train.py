@@ -27,8 +27,6 @@ from torch.autograd import Variable
 from paderbox.array import segment_axis
 from einops import rearrange
 
-DATA_TEST = True
-
 experiment_name = "sad"
 experiment = Experiment(experiment_name)
 
@@ -258,20 +256,7 @@ def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batc
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
-    if DATA_TEST:
-        print(train_set)
-        element = train_set.__iter__().__next__()
-        print(element, type(element))
-        model = get_model()
-        print(element['features'].shape, element['activity'].shape)
-        output = model.forward(element)
-        print(output.shape)
-        print(model.review(element, output))
-        element = validate_set.__iter__().__next__()
-        output = model.forward(element)
-        print(output.shape, element['activity'].shape)
-    else:
-        model_file = storage_dir/'model.json'
-        model_file.write_text(json.dumps(trainer_config['model']))
+    model_file = storage_dir/'model.json'
+    model_file.write_text(json.dumps(trainer_config['model']))
 
         train(trainer_config, train_set, validate_set, load_model_from)
