@@ -243,7 +243,7 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 
 
 @experiment.automain
-def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from):
+def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from, stft_params):
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
     model_file = storage_dir/'model.json'
