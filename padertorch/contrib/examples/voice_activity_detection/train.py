@@ -26,12 +26,6 @@ from torch.autograd import Variable
 from paderbox.array import segment_axis
 from einops import rearrange
 
-STFT_SHIFT = 80
-STFT_WINDOW_LENGTH = 200
-STFT_SIZE = 256
-STFT_PAD = True
-SAMPLE_RATE = 8000
-
 experiment_name = "sad"
 experiment = Experiment(experiment_name)
 
@@ -73,6 +67,12 @@ def config():
     batches_buffer = 4
     train_chunk_size = 4 * SAMPLE_RATE
     validate_chunk_size = 30 * SAMPLE_RATE
+
+    STFT_SHIFT = 80
+    STFT_WINDOW_LENGTH = 200
+    STFT_SIZE = 256
+    STFT_PAD = True
+    SAMPLE_RATE = 8000
 
     data_subset = "stream"
 

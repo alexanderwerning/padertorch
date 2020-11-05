@@ -14,16 +14,8 @@ from padertorch.contrib.examples.voice_activity_detection.train import prepare_d
 from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
 from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
 
-
 ex = sacred.Experiment('VAD Evaluation')
 
-STFT_SHIFT = 80
-STFT_WINDOW_LENGTH = 200
-STFT_SIZE = 256
-SAMPLE_RATE = 8000
-SEGMENT_LENGTH = SAMPLE_RATE * 60
-BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
-TRAINED_MODEL = True
 
 # adapted from padercontrib.database.chime5.database
 def activity_frequency_to_time(
@@ -85,6 +77,13 @@ def config():
     subset = 'stream'
     ignore_buffer = False
     norm = False
+    STFT_SHIFT = 80
+    STFT_WINDOW_LENGTH = 200
+    STFT_SIZE = 256
+    SAMPLE_RATE = 8000
+    SEGMENT_LENGTH = SAMPLE_RATE * 60
+    BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
+    TRAINED_MODEL = True
 
 
 def partition_audio(ex):
