@@ -260,7 +260,6 @@ def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batc
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
     if DATA_TEST:
-        train_set, validate_set = get_datasets()
         print(train_set)
         element = train_set.__iter__().__next__()
         print(element, type(element))
