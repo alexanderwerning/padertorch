@@ -51,7 +51,7 @@ def get_model_config():
             "factory": CNN1d,
             "in_channels": 64,
             "out_channels": [128, 10],
-            "kernel_size": 3,
+            "kernel_size": [3, 1]],
             "input_layer": False,
             "norm": 'batch',
             "output_layer": True,
