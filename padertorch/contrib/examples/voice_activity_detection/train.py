@@ -209,17 +209,17 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
             'activity': example['activity'][:].astype(np.float32),
             'activity_samples': example['activity_samples'][:].astype(np.float32)
         }
-
+    print(dataset, len(dataset))
     dataset = dataset.map(finalize)
-
+    print(dataset, len(dataset))
     dataset = dataset.batch(batch_size).map(Collate(to_tensor=True))
-
+    print(dataset, len(dataset))
     def unpack_tensor(batch):
         batch['features'] = Variable(torch.from_numpy(np.vstack(batch['features'])))
         return batch
 
     dataset = dataset.map(unpack_tensor)
-    print(dataset)
+    print(dataset, len(dataset))
 
     
     return dataset
