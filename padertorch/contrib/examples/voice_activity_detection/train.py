@@ -99,13 +99,13 @@ def config():
     )
 
 
-def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer):
+def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params):
     db = Fearless()
     train_set = db.get_dataset_train(subset=subset)
     validate_set = db.get_dataset_validation(subset=subset)
 
-    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
-    validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
+    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
+    validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
     return training_data, validation_data
 
 
