@@ -258,6 +258,7 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from, stft_params):
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
+    train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
     if DATA_TEST:
         train_set, validate_set = get_datasets()
         print(train_set)
@@ -274,7 +275,5 @@ def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batc
     else:
         model_file = storage_dir/'model.json'
         model_file.write_text(json.dumps(trainer_config['model']))
-
-        train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
 
         train(trainer_config, train_set, validate_set, load_model_from)
