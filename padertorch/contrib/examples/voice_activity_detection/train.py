@@ -104,7 +104,7 @@ def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batc
     train_set = db.get_dataset_train(subset=subset)
     validate_set = db.get_dataset_validation(subset=subset)
 
-    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer)
+    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, train=True)
     validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=8, batches_buffer=batches_buffer)
     return training_data, validation_data
 
@@ -124,7 +124,7 @@ def chunker(example, chunk_size):
         example_chunk.update(activity=example['activity'][start:stop])
         start = stop
 
-    examples = np.shuffle(examples)
+    examples = np.random.shuffle(examples)
 
     return examples
 
