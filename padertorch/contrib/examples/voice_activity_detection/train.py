@@ -236,6 +236,7 @@ def get_trainer(trainer_config, load_model_from):
 
 
 def train(trainer_config, train_set, validate_set, load_model_from):
+    print("Training set size:",len(train_set))
     trainer = get_trainer(trainer_config, load_model_from)
     trainer.register_validation_hook(validate_set)
     trainer.test_run(train_set, validate_set)
