@@ -249,5 +249,5 @@ def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batc
     model_file = storage_dir/'model.json'
     model_file.write_text(json.dumps(trainer_config['model']))
 
-    train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer)
+    train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
     train(trainer_config, train_set, validate_set, load_model_from)
