@@ -137,11 +137,10 @@ def select_speech(example, chunk_size=30*8000):
 
 
 def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=8):
-    db = Fearless()
 
     def prepare_example(example):
         example['audio_path'] = example['audio_path']['observation']
-        example['activity'] = db.get_activity(example)
+        example['activity'] = Fearless.get_activity(example)
         return example
 
     dataset = dataset.map(prepare_example)
@@ -153,7 +152,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     dataset = dataset.prefetch(
         num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
     )
-
+    print(dataset, len(dataset))
     dataset = dataset.map(audio_segmentation)
 
     audio_reader = AudioReader(
