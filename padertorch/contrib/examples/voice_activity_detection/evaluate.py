@@ -69,13 +69,15 @@ def activity_frequency_to_time(
 
 @ex.config
 def config():
-    STFT_SHIFT = 80
-    STFT_WINDOW_LENGTH = 200
-    STFT_SIZE = 256
+    stft_params = {
+        'STFT_SHIFT': 80,
+        'STFT_WINDOW_LENGTH': 200,
+        'STFT_SIZE': 256,
+        'STFT_PAD': True
+    }
     SAMPLE_RATE = 8000
     SEGMENT_LENGTH = SAMPLE_RATE * 60
     BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
-    TRAINED_MODEL = True
 
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
     out_dir = '/home/awerning/out'
@@ -87,42 +89,42 @@ def config():
     norm = False
 
 
-def partition_audio(ex):
+def partition_audio(ex, segment_length, buffer_size):
     num_samples = ex['num_samples']
     index = ex['index']
-    start = index * SEGMENT_LENGTH
-    stop = start + SEGMENT_LENGTH
+    start = index * segment_length
+    stop = start + segment_length
 
-    ex['audio_start_samples'] = start - BUFFER_SIZE
-    ex['audio_stop_samples'] = stop + BUFFER_SIZE
+    ex['audio_start_samples'] = start - buffer_size
+    ex['audio_stop_samples'] = stop + buffer_size
     return ex
 
 
-def get_data(ex):
+def get_data(ex, segment_length, buffer_size):
     num_samples = ex['num_samples']
     ex['num_samples']
     dict_dataset = {}
-    for index in range(math.ceil(num_samples / SEGMENT_LENGTH)):
+    for index in range(math.ceil(num_samples / segment_length)):
         sub_ex = ex.copy()
         sub_ex['index'] = index
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    return prepare_dataset(lazy_dataset.new(dict_dataset), partition_audio, batch_size=1)
+    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex, segment_length, buffer_size), batch_size=1)
 
 
-def get_model_output(ex, model, db):
+def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
     predictions = []
     sequence_lengths = []
-    dataset = get_data(ex)
+    dataset = get_data(ex, segment_length, buffer_size)
     for batch in dataset:
         model_out_org = model(batch).detach().numpy()
 
         with_buffer_per_sample = activity_frequency_to_time(
                                                 model_out_org,
-                                                stft_window_length=STFT_WINDOW_LENGTH,
-                                                stft_shift=STFT_SHIFT)
-        model_out = with_buffer_per_sample[..., BUFFER_SIZE:SEGMENT_LENGTH+BUFFER_SIZE]
+                                                stft_window_length=stft_params['STFT_WINDOW_LENGTH'],
+                                                stft_shift=stft_params['STFT_SHIFT'])
+        model_out = with_buffer_per_sample[..., buffer_size:segment_length+buffer_size]
         predictions.extend(model_out)
     return predictions
 
@@ -136,7 +138,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @ex.automain
-def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
+def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, SEGMENT_LENGTH, BUFFER_SIZE, stft_params):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
     model_file = (model_dir/"model.json")
@@ -145,9 +147,8 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
     else:
         model_config = get_model_config()
     model = Configurable.from_config(model_config)
-    if TRAINED_MODEL:
-        state_dict = torch.load(Path(model_dir/'checkpoints'/'ckpt_latest.pth'))['model']
-        model.load_state_dict(state_dict)
+    state_dict = torch.load(Path(model_dir/'checkpoints'/'ckpt_latest.pth'))['model']
+    model.load_state_dict(state_dict)
     db = Fearless()
     model.eval()
 
@@ -160,7 +161,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
-            lambda ex: get_model_output(ex, model, db),
+            lambda ex: get_model_output(ex, model, db, stft_params, SEGMENT_LENGTH, BUFFER_SIZE),
             lambda out, th, ex: get_binary_classification(out, th),
             lambda ex: get_target_fn(ex),
             num_thresholds=num_ths,
@@ -171,11 +172,8 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset):
             out_dir = model_dir
         else:
             out_dir = Path(out_dir).expanduser().resolve()
-        if TRAINED_MODEL:
-            model_name = Path(model_dir).stem
-            output_file = out_dir / f'stats_fearless_{model_name}_{buffer_zone}.txt'
-        else:
-            output_file = out_dir / f'stats_fearless_{buffer_zone}_no_train.txt'
+        model_name = Path(model_dir).stem
+        output_file = out_dir / f'stats_fearless_{model_name}_{buffer_zone}.txt'
         output_file.write_text(
             '\n'.join([
                 ' '.join([str(v) for v in value]) for value in

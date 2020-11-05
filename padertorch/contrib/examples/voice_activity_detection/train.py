@@ -62,10 +62,13 @@ def get_model_config():
 
 @experiment.config
 def config():
-    STFT_SHIFT = 80
-    STFT_WINDOW_LENGTH = 200
-    STFT_SIZE = 256
-    STFT_PAD = True
+    stft_params = {
+        'STFT_SHIFT': 80,
+        'STFT_WINDOW_LENGTH': 200,
+        'STFT_SIZE': 256,
+        'STFT_PAD': True
+    }
+
     SAMPLE_RATE = 8000
 
     debug = False
@@ -133,7 +136,7 @@ def select_speech(example, chunk_size=30*8000):
     return example
 
 
-def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, batches_buffer=4, num_workers=8):
+def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=8):
     db = Fearless()
 
     def prepare_example(example):
@@ -176,10 +179,10 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, ba
     dataset = dataset.map(read_and_pad_audio)
 
     stft = STFT(
-        shift=STFT_SHIFT,
-        size=STFT_SIZE,
-        window_length=STFT_WINDOW_LENGTH,
-        pad=STFT_PAD,
+        shift=stft_params['STFT_SHIFT'],
+        size=stft_params['STFT_SIZE'],
+        window_length=stft_params['STFT_WINDOW_LENGTH'],
+        pad=stft_params['STFT_PAD'],
         fading=None
     )
 
@@ -191,9 +194,9 @@ def prepare_dataset(dataset, audio_segmentation, shuffle=False, batch_size=8, ba
         example['features'] = features
         example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'][:],
-                                           length=STFT_WINDOW_LENGTH,
-                                           shift=STFT_SHIFT,
-                                           end='pad' if STFT_PAD else 'cut'
+                                           length=stft_params['STFT_WINDOW_LENGTH'],
+                                           shift=stft_params['STFT_SHIFT'],
+                                           end='pad' if stft_params['STFT_PAD'] else 'cut'
                                            ).any(axis=-1)
         return example
 
