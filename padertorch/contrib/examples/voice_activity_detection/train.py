@@ -104,20 +104,29 @@ def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batc
     train_set = db.get_dataset_train(subset=subset)
     validate_set = db.get_dataset_validation(subset=subset)
 
-    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
-    validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=batch_size, batches_buffer=batches_buffer, num_workers=batch_size)
+    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer)
+    validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=8, batches_buffer=batches_buffer)
     return training_data, validation_data
 
 
 def chunker(example, chunk_size):
     """Cut out a random 4s segment from the stream for training."""
+
     start = max(0, np.random.randint(example['num_samples'])-chunk_size)
-    stop = start + chunk_size
-    example.update(audio_start_samples=start)
-    example.update(audio_stop_samples=stop)
-    example.update(audio_path=example['audio_path'])
-    example.update(activity=example['activity'][start:stop])
-    return example
+
+    examples = []
+
+    for _ in range((example['num_samples']-start)//chunk_size):
+        example_chunk = example.copy()
+        stop = start + chunk_size
+        example_chunk.update(audio_start_samples=start)
+        example_chunk.update(audio_stop_samples=stop)
+        example_chunk.update(activity=example['activity'][start:stop])
+        start = stop
+
+    examples = np.shuffle(examples)
+
+    return examples
 
 
 def select_speech(example, chunk_size=30*8000):
@@ -136,7 +145,7 @@ def select_speech(example, chunk_size=30*8000):
     return example
 
 
-def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=8):
+def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=6, train=False):
 
     def prepare_example(example):
         example['audio_path'] = example['audio_path']['observation']
@@ -152,8 +161,12 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     dataset = dataset.prefetch(
         num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
     )
-    print(dataset, len(dataset))
-    dataset = dataset.map(audio_segmentation)
+
+    if train:
+        dataset = dataset.map(audio_segmentation)
+        dataset = dataset.unbatch()
+    else:
+        dataset = dataset.map(audio_segmentation)
 
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
@@ -204,24 +217,22 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     def finalize(example):
         return {
             'example_id': example['example_id'],
-            'features': Variable(torch.from_numpy(example['features'])),
+            'features': example['features'],
             'seq_len': example['features'].shape[-1],
             'activity': example['activity'][:].astype(np.float32),
             'activity_samples': example['activity_samples'][:].astype(np.float32)
         }
-    print(dataset, len(dataset))
+
     dataset = dataset.map(finalize)
-    print(dataset, len(dataset))
-    dataset = dataset.batch(batch_size).map(Collate(to_tensor=True))
-    print(dataset, len(dataset))
+
+    dataset = dataset.batch(batch_size).map(Collate(to_tensor=False))
+
     def unpack_tensor(batch):
-        batch['features'] = Variable(torch.from_numpy(np.vstack(batch['features'])))
+        batch['features'] = np.vstack(batch['features'])
         return batch
 
     dataset = dataset.map(unpack_tensor)
-    print(dataset, len(dataset))
 
-    
     return dataset
 
 
