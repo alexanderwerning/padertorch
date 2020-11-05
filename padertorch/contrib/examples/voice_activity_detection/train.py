@@ -126,7 +126,7 @@ def chunker(example, chunk_size):
         start = stop
 
     random.shuffle(examples)
-    print('examples dtype', type(examples))
+
     return examples
 
 
