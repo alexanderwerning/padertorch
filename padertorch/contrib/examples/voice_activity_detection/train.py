@@ -220,6 +220,11 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     dataset = dataset.map(finalize)
 
+    buffer_size = int(batches_buffer * batch_size)
+    dataset = dataset.prefetch(
+        num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
+    )
+
     dataset = dataset.batch(batch_size).map(Collate(to_tensor=False))
 
     def unpack_tensor(batch):
@@ -227,11 +232,6 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         return batch
 
     dataset = dataset.map(unpack_tensor)
-
-    buffer_size = int(batches_buffer * batch_size)
-    dataset = dataset.prefetch(
-        num_workers=min(num_workers, buffer_size), buffer_size=buffer_size
-    )
 
     return dataset
 
