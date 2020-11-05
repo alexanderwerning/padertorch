@@ -26,6 +26,8 @@ from torch.autograd import Variable
 from paderbox.array import segment_axis
 from einops import rearrange
 
+DATA_TEST = True
+
 experiment_name = "sad"
 experiment = Experiment(experiment_name)
 
@@ -68,7 +70,6 @@ def config():
         'STFT_SIZE': 256,
         'STFT_PAD': True
     }
-    DATA_TEST = True
     SAMPLE_RATE = 8000
 
     debug = False
