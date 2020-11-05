@@ -123,6 +123,7 @@ def chunker(example, chunk_size):
         example_chunk.update(audio_start_samples=start)
         example_chunk.update(audio_stop_samples=stop)
         example_chunk.update(activity=example['activity'][start:stop])
+        examples.append(example_chunk)
         start = stop
 
     examples = np.random.shuffle(examples)
