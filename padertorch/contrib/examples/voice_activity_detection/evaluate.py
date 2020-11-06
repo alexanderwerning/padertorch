@@ -100,7 +100,7 @@ def partition_audio(ex, segment_length, buffer_size):
     return ex
 
 
-def get_data(ex, segment_length, buffer_size):
+def get_data(ex, stft_params, segment_length, buffer_size):
     num_samples = ex['num_samples']
     ex['num_samples']
     dict_dataset = {}
@@ -110,14 +110,16 @@ def get_data(ex, segment_length, buffer_size):
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex, segment_length, buffer_size), batch_size=1)
+    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex, segment_length, buffer_size), stft_params batch_size=1)
 
 
 def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
     predictions = []
-    sequence_lengths = []
-    dataset = get_data(ex, segment_length, buffer_size)
+    sequence_lengths = [] 
+    dataset = get_data(ex, stft_params, segment_length, buffer_size)
+
     for batch in dataset:
+        batch = padertorch.data.example_to_device(batch, 'cpu')
         model_out_org = model(batch).detach().numpy()
 
         with_buffer_per_sample = activity_frequency_to_time(
@@ -147,7 +149,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, SEGMENT_LENGTH,
     else:
         model_config = get_model_config()
     model = Configurable.from_config(model_config)
-    state_dict = torch.load(Path(model_dir/'checkpoints'/'ckpt_latest.pth'))['model']
+    state_dict = torch.load(Path(model_dir/'checkpoints'/'ckpt_latest.pth'), map_location='cpu')['model']
     model.load_state_dict(state_dict)
     db = Fearless()
     model.eval()
