@@ -13,6 +13,7 @@ from padertorch.configurable import Configurable
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
 from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
+from padertorch.data import example_to_device
 
 ex = sacred.Experiment('VAD Evaluation')
 
@@ -119,7 +120,7 @@ def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
     dataset = get_data(ex, stft_params, segment_length, buffer_size)
 
     for batch in dataset:
-        batch = padertorch.data.example_to_device(batch, 'cpu')
+        batch = example_to_device(batch, 'cpu')
         model_out_org = model(batch).detach().numpy()
 
         with_buffer_per_sample = activity_frequency_to_time(
