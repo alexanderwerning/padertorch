@@ -110,7 +110,7 @@ def get_data(ex, stft_params, segment_length, buffer_size):
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex, segment_length, buffer_size), stft_params batch_size=1)
+    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex, segment_length, buffer_size), stft_params, batch_size=1)
 
 
 def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
