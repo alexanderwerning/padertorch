@@ -72,7 +72,7 @@ def config():
     SAMPLE_RATE = 8000
 
     debug = False
-    batch_size = 8
+    batch_size = 64
     batches_buffer = 4
     train_chunk_size = 4 * SAMPLE_RATE
     validate_chunk_size = 30 * SAMPLE_RATE
