@@ -80,14 +80,13 @@ def config():
     SEGMENT_LENGTH = SAMPLE_RATE * 60
     BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
 
-    model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01/checkpoints'
+    model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01'
     out_dir = '/home/awerning/out'
     num_ths = 201
     buffer_zone = 0.5
     ckpt = 'ckpt_latest.pth'
     subset = 'stream'
     ignore_buffer = False
-    norm = False
 
 
 def partition_audio(ex, segment_length, buffer_size):
