@@ -72,7 +72,8 @@ def config():
     }
 
 
-def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params):
+@capture
+def get_datasets():
     db = Fearless()
     train_set = db.get_dataset_train(subset=subset)
     validate_set = db.get_dataset_validation(subset=subset)
@@ -151,19 +152,9 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         example["audio_data"] = audio
         return example
 
-    audio_reader = AudioReader(
-        source_sample_rate=8000, target_sample_rate=8000
-    )
+    dataset = dataset.map(audio_reader_fn(read_audio))
 
-    dataset = dataset.map(audio_reader_fn(audio_reader))
-
-    stft = STFT(
-        shift=stft_params['STFT_SHIFT'],
-        size=stft_params['STFT_SIZE'],
-        window_length=stft_params['STFT_WINDOW_LENGTH'],
-        pad=stft_params['STFT_PAD'],
-        fading=None
-    )
+    stft = STFT(**stft_params)
 
     def calculate_stft(example):
         complex_spectrum = stft(example['audio_data'])
