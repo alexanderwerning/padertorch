@@ -55,5 +55,5 @@
     },
     "activation": {
         "factory": "torch.nn.modules.activation.Sigmoid"
-    },
+    }
 }
