@@ -9,11 +9,12 @@ import torch
 import lazy_dataset
 from paderbox.array import segment_axis
 from padercontrib.database.fearless import Fearless
-from padertorch.configurable import Configurable
-from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
-from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
-from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
-from padertorch.data import example_to_device
+import padertorch as pt
+from pt.configurable import Configurable
+from pt.contrib.examples.voice_activity_detection.train import prepare_dataset
+from pt.contrib.examples.voice_activity_detection.train import get_model_config
+from pt.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
+from pt.data import example_to_device
 
 ex = sacred.Experiment('VAD Evaluation')
 
@@ -71,14 +72,14 @@ def activity_frequency_to_time(
 @ex.config
 def config():
     stft_params = {
-        'STFT_SHIFT': 80,
-        'STFT_WINDOW_LENGTH': 200,
-        'STFT_SIZE': 256,
-        'STFT_PAD': True
+        'shift': 80,
+        'window_length': 200,
+        'size': 256,
+        'pad': True
     }
-    SAMPLE_RATE = 8000
-    SEGMENT_LENGTH = SAMPLE_RATE * 60
-    BUFFER_SIZE = SAMPLE_RATE//2  # buffer around segments to avoid artifacts
+    sample_rate = 8000
+    segment_length = sample_rate * 60
+    buffer_size = sample_rate//2  # buffer around segments to avoid artifacts
 
     model_dir = '/home/awerning/tmp_storage/voice_activity/2020-09-11-12-28-01'
     out_dir = '/home/awerning/out'
@@ -89,6 +90,7 @@ def config():
     ignore_buffer = False
 
 
+@ex.capture
 def partition_audio(ex, segment_length, buffer_size):
     num_samples = ex['num_samples']
     index = ex['index']
@@ -100,7 +102,25 @@ def partition_audio(ex, segment_length, buffer_size):
     return ex
 
 
-def get_data(ex, stft_params, segment_length, buffer_size):
+def read_and_pad_audio(ex):
+    ex_num_samples = ex['audio_stop_samples'] - ex['audio_start_samples']
+    padding_front = abs(min(0, ex['audio_start_samples']))
+    padding_back = max(0, ex['audio_stop_samples']-ex['num_samples'])
+    ex['audio_start_samples'] = max(0, ex['audio_start_samples'])
+    ex['audio_stop_samples'] = min(ex['audio_stop_samples'], ex['num_samples'])
+    ex = audio_reader(ex)
+    padded_audio_data = np.zeros((ex_num_samples))
+    if padding_back == 0:
+        padded_audio_data[padding_front:] = ex['audio_data'].flatten()
+    else:
+        padded_audio_data[padding_front:-padding_back] = ex['audio_data'].flatten()
+    ex['audio_data'] = padded_audio_data
+
+    return ex
+
+
+@ex.capture
+def get_data(ex):
     num_samples = ex['num_samples']
     ex['num_samples']
     dict_dataset = {}
@@ -110,10 +130,11 @@ def get_data(ex, stft_params, segment_length, buffer_size):
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex, segment_length, buffer_size), stft_params, batch_size=1)
+    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex), stft_params, batch_size=1, audio_reader_fn=read_and_pad_audio)
 
 
-def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
+@ex.capture
+def get_model_output(ex, model, db):
     predictions = []
     sequence_lengths = [] 
     dataset = get_data(ex, stft_params, segment_length, buffer_size)
@@ -124,8 +145,8 @@ def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
 
         with_buffer_per_sample = activity_frequency_to_time(
                                                 model_out_org,
-                                                stft_window_length=stft_params['STFT_WINDOW_LENGTH'],
-                                                stft_shift=stft_params['STFT_SHIFT'])
+                                                stft_window_length=stft_params['window_length'],
+                                                stft_shift=stft_params['shift'])
         model_out = with_buffer_per_sample[..., buffer_size:segment_length+buffer_size]
         predictions.extend(model_out)
     return predictions
@@ -140,22 +161,22 @@ def get_binary_classification(model_out, threshold):
 
 
 @ex.automain
-def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, SEGMENT_LENGTH, BUFFER_SIZE, stft_params):
+def main():
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
-    model_file = (model_dir/"model.json")
-    if model_file.exists():
-        model_config = json.loads(model_file.read_text())
+    config_file = (model_dir/"config.json")
+    if config_file.exists():
+        model_config = load_config(model_file)
     else:
         model_config = get_model_config()
-    model = Configurable.from_config(model_config)
-    state_dict = torch.load(Path(model_dir/'checkpoints'/'ckpt_latest.pth'), map_location='cpu')['model']
+    model = Configurable.from_config(model_config['model'])
+    state_dict = torch.load(Path(model_dir/'checkpoints'/ckpt), map_location='cpu')['model']
     model.load_state_dict(state_dict)
     db = Fearless()
     model.eval()
 
     def get_target_fn(ex):
-        padded_length = SEGMENT_LENGTH*(math.ceil(ex['num_samples'] / SEGMENT_LENGTH))
+        padded_length = segment_length*(math.ceil(ex['num_samples'] / segment_length))
         per_sample_vad = np.zeros(padded_length)
         per_sample_vad[:ex['num_samples']] = db.get_activity(ex)[:]
         return per_sample_vad
@@ -163,7 +184,7 @@ def main(model_dir, num_ths, buffer_zone, ckpt, out_dir, subset, SEGMENT_LENGTH,
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
-            lambda ex: get_model_output(ex, model, db, stft_params, SEGMENT_LENGTH, BUFFER_SIZE),
+            lambda ex: get_model_output(ex, model, db),
             lambda out, th, ex: get_binary_classification(out, th),
             lambda ex: get_target_fn(ex),
             num_thresholds=num_ths,

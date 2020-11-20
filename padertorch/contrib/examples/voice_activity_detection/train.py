@@ -17,20 +17,24 @@ from paderbox.utils.timer import timeStamped
 from paderbox.transform.module_stft import STFT
 from padercontrib.database.fearless import Fearless
 from padertorch import Trainer
+from padertorch.io import get_new_storage_dir, dump_config, load_config
 from padertorch.contrib.examples.voice_activity_detection.model import SAD_Classifier
-from padertorch.contrib.je.data.transforms import AudioReader, Collate
 from padertorch.contrib.je.modules.conv import CNN1d, CNN2d
 from padertorch.train.optimizer import Adam
+from padertorch.data.utils import collate_fn
 import torch
 from torch.nn import MaxPool2d
-from torch.autograd import Variable
 from paderbox.array import segment_axis
 from einops import rearrange
+
+import soundfile
 
 experiment_name = "sad"
 experiment = Experiment(experiment_name)
 
+
 def get_model_config():
+    return load_config("default_model_config.json")
     return {
         "factory": SAD_Classifier,
         "conv_layer": {
@@ -63,19 +67,21 @@ def get_model_config():
 
 @experiment.config
 def config():
+     trainer_config = json_load("default_config.json")
+     trainer_config["model"] = get_model_config()
     stft_params = {
         'STFT_SHIFT': 80,
         'STFT_WINDOW_LENGTH': 200,
         'STFT_SIZE': 256,
         'STFT_PAD': True
     }
-    SAMPLE_RATE = 8000
+    sample_rate = 8000
 
     debug = False
     batch_size = 64
     batches_buffer = 4
-    train_chunk_size = 4 * SAMPLE_RATE
-    validate_chunk_size = 30 * SAMPLE_RATE
+    train_chunk_size = 4 * sample_rate
+    validate_chunk_size = 30 * sample_rate
 
     data_subset = "stream"
 
@@ -83,7 +89,7 @@ def config():
 
     trainer_config = {
         "model": get_model_config(),
-        "storage_dir": str(Path(os.environ['STORAGE_ROOT']) / 'voice_activity' / timeStamped('')[1:]),
+        "storage_dir": get_new_storage_dir(experiment_name, timeStamped('')[1:]),
         "optimizer": {
             "factory": Adam,
             "lr": 1e-3
@@ -92,11 +98,6 @@ def config():
         "checkpoint_trigger": (1000, "iteration"),
         "stop_trigger": (50000, "iteration") if not debug else (5000, "iteration"),
     }
-    Trainer.get_config(trainer_config)
-
-    experiment.observers.append(FileStorageObserver(
-        Path(trainer_config['storage_dir']) / 'sacred')
-    )
 
 
 def get_datasets(subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params):
@@ -146,7 +147,7 @@ def select_speech(example, chunk_size=30*8000):
     return example
 
 
-def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=6, train=False):
+def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=6, train=False, audio_reader_fn=lambda x: x()):
 
     def prepare_example(example):
         example['audio_path'] = example['audio_path']['observation']
@@ -165,27 +166,24 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     buffer_size = int(batches_buffer * batch_size)
 
+
+    def read_audio(example):
+        audio_path = str(example["audio_path"])
+        start_samples = example["audio_start_samples"]
+        stop_samples = example["audio_stop_samples"]
+
+        x, sr = soundfile.read(
+            audio_path, start=start_samples, stop=stop_samples, always_2d=True
+        )
+        audio = x.T
+        example["audio_data"] = audio
+        return example
+
     audio_reader = AudioReader(
         source_sample_rate=8000, target_sample_rate=8000
     )
 
-    def read_and_pad_audio(ex):
-        ex_num_samples = ex['audio_stop_samples'] - ex['audio_start_samples']
-        padding_front = abs(min(0, ex['audio_start_samples']))
-        padding_back = max(0, ex['audio_stop_samples']-ex['num_samples'])
-        ex['audio_start_samples'] = max(0, ex['audio_start_samples'])
-        ex['audio_stop_samples'] = min(ex['audio_stop_samples'], ex['num_samples'])
-        ex = audio_reader(ex)
-        padded_audio_data = np.zeros((ex_num_samples))
-        if padding_back == 0:
-            padded_audio_data[padding_front:] = ex['audio_data'].flatten()
-        else:
-            padded_audio_data[padding_front:-padding_back] = ex['audio_data'].flatten()
-        ex['audio_data'] = padded_audio_data
-
-        return ex
-
-    dataset = dataset.map(read_and_pad_audio)
+    dataset = dataset.map(audio_reader_fn(audio_reader))
 
     stft = STFT(
         shift=stft_params['STFT_SHIFT'],
@@ -199,7 +197,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         complex_spectrum = stft(example['audio_data'])
         real_magnitude = (np.abs(complex_spectrum)**2).astype(np.float32)
         features = rearrange(real_magnitude[None, None, ...],
-                             'b c f t -> b c t f', c=1, b=1)[:, :, :-1, :]
+                             'b c t f -> b c f t', c=1, b=1)[:, :, :, :]
         example['features'] = features
         example['activity_samples'] = example['activity'][:]
         example['activity'] = segment_axis(example['activity'][:],
@@ -222,7 +220,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     dataset = dataset.map(finalize)
 
-    dataset = dataset.batch(batch_size).map(Collate(to_tensor=False))
+    dataset = dataset.batch(batch_size).map(collate_fn)
 
     def unpack_tensor(batch):
         batch['features'] = np.vstack(batch['features'])
@@ -252,11 +250,14 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 
 
 @experiment.automain
-def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from, stft_params):
+def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from, ):
+    Trainer.get_config(trainer_config)
+
+    experiment.observers.append(FileStorageObserver(
+        Path(trainer_config['storage_dir']) / 'sacred')
+    )
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
-    model_file = storage_dir/'model.json'
-    model_file.write_text(json.dumps(trainer_config['model']))
+    dump_config(trainer_config, storage_dir/'config.json')
     train(trainer_config, train_set, validate_set, load_model_from)
-

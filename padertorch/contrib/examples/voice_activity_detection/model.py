@@ -2,7 +2,6 @@ import numpy as np
 from padertorch.contrib.je.modules.conv import CNN1d, CNN2d
 from padertorch.base import Model
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
 
 
@@ -37,7 +36,7 @@ class SAD_Classifier(Model):
 
     def review(self, inputs, outputs):
         activity = inputs['activity']
-        bce = torch.nn.BCELoss(reduction='none')(outputs, activity)
+        bce = nn.BCELoss(reduction='none')(outputs, activity)
         scalar_names = [
             'true_pos_{thres}',
             'false_pos_{thres}',
@@ -60,7 +59,7 @@ class SAD_Classifier(Model):
             results.update(zip(keys, values))
 
         summary = dict(
-            loss=bce.mean(),
+            loss=bce.sum(),
             scalars=results
         )
         return summary
