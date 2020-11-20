@@ -49,7 +49,7 @@ def config():
     }
     trainer_config["model"] = get_model_config()
     if "storage_dir" not in trainer_config:
-        trainer_config["storage_dir"] = get_new_storage_dir(experiment_name, timeStamped('')[1:])
+        trainer_config["storage_dir"] = get_new_storage_dir(experiment_name, id_naming="time")
 
     stft_params = {
         'shift': 80,
