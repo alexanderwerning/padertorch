@@ -35,40 +35,14 @@ experiment = Experiment(experiment_name)
 
 def get_model_config():
     return load_config("default_model_config.json")
-    return {
-        "factory": SAD_Classifier,
-        "conv_layer": {
-            "factory": CNN2d,
-            "in_channels": 1,
-            "out_channels": 2*[16] + 2*[32] + 2*[64],
-            "kernel_size": 3,
-            "norm": 'batch',
-            "output_layer": False,
-            "pool_size": [1, (4, 1)] + 2*[1, (8, 1)]
-        },
-        "temporal_layer": {
-            "factory": CNN1d,
-            "in_channels": 64,
-            "out_channels": [128, 10],
-            "kernel_size": [3, 1],
-            "input_layer": False,
-            "norm": 'batch',
-            "output_layer": True,
-            "pool_size": 1
-        },
-        "pooling": {
-            "factory": MaxPool2d,
-            "kernel_size": (10, 1)
-        },
-        "activation": {
-            "factory": torch.nn.Sigmoid
-        }
-    }
 
 @experiment.config
 def config():
      trainer_config = json_load("default_config.json")
      trainer_config["model"] = get_model_config()
+     if "storage_dir" not in trainer_config:
+         trainer_config["storage_dir"] = get_new_storage_dir(experiment_name, timeStamped('')[1:])
+
     stft_params = {
         'STFT_SHIFT': 80,
         'STFT_WINDOW_LENGTH': 200,
@@ -88,15 +62,13 @@ def config():
     load_model_from = None
 
     trainer_config = {
-        "model": get_model_config(),
-        "storage_dir": get_new_storage_dir(experiment_name, timeStamped('')[1:]),
         "optimizer": {
             "factory": Adam,
             "lr": 1e-3
         },
         "summary_trigger": (100, "iteration"),
         "checkpoint_trigger": (1000, "iteration"),
-        "stop_trigger": (50000, "iteration") if not debug else (5000, "iteration"),
+        "stop_trigger": (50000, "iteration"),
     }
 
 

@@ -1,0 +1,29 @@
+{
+        "factory": SAD_Classifier,
+        "conv_layer": {
+            "factory": CNN2d,
+            "in_channels": 1,
+            "out_channels": 2*[16] + 2*[32] + 2*[64],
+            "kernel_size": 3,
+            "norm": 'batch',
+            "output_layer": False,
+            "pool_size": [1, (4, 1)] + 2*[1, (8, 1)]
+        },
+        "temporal_layer": {
+            "factory": CNN1d,
+            "in_channels": 64,
+            "out_channels": [128, 10],
+            "kernel_size": [3, 1],
+            "input_layer": False,
+            "norm": 'batch',
+            "output_layer": True,
+            "pool_size": 1
+        },
+        "pooling": {
+            "factory": MaxPool2d,
+            "kernel_size": (10, 1)
+        },
+        "activation": {
+            "factory": torch.nn.Sigmoid
+        }
+    }
