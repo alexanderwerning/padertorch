@@ -16,7 +16,7 @@ from pt.contrib.examples.voice_activity_detection.train import get_model_config
 from pt.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
 from pt.data import example_to_device
 
-ex = sacred.Experiment('VAD Evaluation')
+experiment = sacred.Experiment('VAD Evaluation')
 
 
 # adapted from padercontrib.database.chime5.database
@@ -69,7 +69,7 @@ def activity_frequency_to_time(
     return time_activity
 
 
-@ex.config
+@experiment.config
 def config():
     stft_params = {
         'shift': 80,
@@ -90,7 +90,7 @@ def config():
     ignore_buffer = False
 
 
-@ex.capture
+@experiment.capture
 def partition_audio(ex, segment_length, buffer_size):
     num_samples = ex['num_samples']
     index = ex['index']
@@ -119,7 +119,7 @@ def read_and_pad_audio(ex):
     return ex
 
 
-@ex.capture
+@experiment.capture
 def get_data(ex):
     num_samples = ex['num_samples']
     ex['num_samples']
@@ -133,7 +133,7 @@ def get_data(ex):
     return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex), stft_params, batch_size=1, audio_reader_fn=read_and_pad_audio)
 
 
-@ex.capture
+@experiment.capture
 def get_model_output(ex, model, db):
     predictions = []
     sequence_lengths = [] 
@@ -160,7 +160,7 @@ def get_binary_classification(model_out, threshold):
     return np.concatenate(vad, axis=-1).astype(np.bool)
 
 
-@ex.automain
+@experiment.automain
 def main():
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir

@@ -70,7 +70,7 @@ def config():
     load_model_from = None
 
 
-@capture
+@experiment.capture
 def get_datasets():
     db = Fearless()
     train_set = db.get_dataset_train(subset=subset)
