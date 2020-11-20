@@ -1,29 +1,59 @@
 {
-        "factory": SAD_Classifier,
-        "conv_layer": {
-            "factory": CNN2d,
-            "in_channels": 1,
-            "out_channels": 2*[16] + 2*[32] + 2*[64],
-            "kernel_size": 3,
-            "norm": 'batch',
-            "output_layer": False,
-            "pool_size": [1, (4, 1)] + 2*[1, (8, 1)]
-        },
-        "temporal_layer": {
-            "factory": CNN1d,
-            "in_channels": 64,
-            "out_channels": [128, 10],
-            "kernel_size": [3, 1],
-            "input_layer": False,
-            "norm": 'batch',
-            "output_layer": True,
-            "pool_size": 1
-        },
-        "pooling": {
-            "factory": MaxPool2d,
-            "kernel_size": (10, 1)
-        },
-        "activation": {
-            "factory": torch.nn.Sigmoid
-        }
-    }
+    "factory": "padertorch.contrib.examples.voice_activity_detection.model.SAD_Classifier",
+    "conv_layer": {
+        "activation_fn": "relu",
+        "dense_connections": null,
+        "dilation": 1,
+        "dropout": 0.0,
+        "factory": "padertorch.contrib.je.modules.conv.CNN2d",
+        "gated": false,
+        "in_channels": 1,
+        "input_layer": true,
+        "kernel_size": 3,
+        "norm": "batch",
+        "norm_kwargs": null,
+        "out_channels": [16, 16, 32, 32, 64, 64],
+        "output_layer": false,
+        "pad_type": "both",
+        "pool_size": [1, [4, 1], 1, [8, 1], 1, [8, 1]],
+        "pool_type": "max",
+        "pre_activation": false,
+        "residual_connections": null,
+        "return_pool_indices": false,
+        "stride": 1
+    },
+    "temporal_layer": {
+        "activation_fn": "relu",
+        "dense_connections": null,
+        "dilation": 1,
+        "dropout": 0.0,
+        "factory": "padertorch.contrib.je.modules.conv.CNN1d",
+        "gated": false,
+        "in_channels": 64,
+        "input_layer": false,
+        "kernel_size": [3, 1],
+        "norm": "batch",
+        "norm_kwargs": null,
+        "out_channels": [128, 10],
+        "output_layer": true,
+        "pad_type": "both",
+        "pool_size": 1,
+        "pool_type": "max",
+        "pre_activation": false,
+        "residual_connections": null,
+        "return_pool_indices": false,
+        "stride": 1
+    },
+    "pooling": {
+        "ceil_mode": false,
+        "dilation": 1,
+        "factory": "torch.nn.modules.pooling.MaxPool2d",
+        "kernel_size": [10, 1],
+        "padding": 0,
+        "return_indices": false,
+        "stride": null
+    },
+    "activation": {
+        "factory": "torch.nn.modules.activation.Sigmoid"
+    },
+}
