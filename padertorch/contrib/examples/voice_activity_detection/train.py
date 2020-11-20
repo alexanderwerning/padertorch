@@ -38,16 +38,24 @@ def get_model_config():
 
 @experiment.config
 def config():
-     trainer_config = json_load("default_config.json")
-     trainer_config["model"] = get_model_config()
-     if "storage_dir" not in trainer_config:
-         trainer_config["storage_dir"] = get_new_storage_dir(experiment_name, timeStamped('')[1:])
+    trainer_config = {
+        "optimizer": {
+            "factory": Adam,
+            "lr": 1e-3
+        },
+        "summary_trigger": (100, "iteration"),
+        "checkpoint_trigger": (1000, "iteration"),
+        "stop_trigger": (50000, "iteration")
+    }
+    trainer_config["model"] = get_model_config()
+    if "storage_dir" not in trainer_config:
+        trainer_config["storage_dir"] = get_new_storage_dir(experiment_name, timeStamped('')[1:])
 
     stft_params = {
-        'STFT_SHIFT': 80,
-        'STFT_WINDOW_LENGTH': 200,
-        'STFT_SIZE': 256,
-        'STFT_PAD': True
+        'shift': 80,
+        'window_length': 200,
+        'size': 256,
+        'pad': True
     }
     sample_rate = 8000
 
@@ -60,16 +68,6 @@ def config():
     data_subset = "stream"
 
     load_model_from = None
-
-    trainer_config = {
-        "optimizer": {
-            "factory": Adam,
-            "lr": 1e-3
-        },
-        "summary_trigger": (100, "iteration"),
-        "checkpoint_trigger": (1000, "iteration"),
-        "stop_trigger": (50000, "iteration"),
-    }
 
 
 @capture
