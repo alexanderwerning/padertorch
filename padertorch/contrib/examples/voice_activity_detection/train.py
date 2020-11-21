@@ -69,7 +69,7 @@ def config():
 
     load_model_from = None
 
-    Trainer.get_config(trainer_config)
+    trainer_config = Trainer.get_config(trainer_config)
 
 
 @experiment.capture
@@ -215,7 +215,7 @@ def train(train_set, validate_set):
 
 
 @experiment.automain
-def main():
+def main(trainer_config):
     experiment.observers.append(FileStorageObserver(
         Path(trainer_config['storage_dir']) / 'sacred')
     )
