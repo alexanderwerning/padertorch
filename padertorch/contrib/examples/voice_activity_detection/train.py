@@ -215,12 +215,12 @@ def train(train_set, validate_set):
 
 
 @experiment.automain
-def main(trainer_config, data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params):
+def main(trainer_config):
     experiment.observers.append(FileStorageObserver(
         Path(trainer_config['storage_dir']) / 'sacred')
     )
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
-    train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
+    train_set, validate_set = get_datasets()
     dump_config(trainer_config, storage_dir/'config.json')
     train(train_set, validate_set)
