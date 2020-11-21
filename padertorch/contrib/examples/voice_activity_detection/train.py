@@ -189,6 +189,8 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     def unpack_tensor(batch):
         batch['features'] = np.vstack(batch['features'])
+        batch['activity'] = np.vstack(batch['activity'])
+        batch['activity_samples'] = np.vstack(batch['activity_samples'])
         return batch
 
     dataset = dataset.map(unpack_tensor)
