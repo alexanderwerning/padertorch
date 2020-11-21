@@ -11,6 +11,8 @@ from pathlib import Path
 
 from sacred import Experiment
 from sacred.observers.file_storage import FileStorageObserver
+from sacred import SETTINGS
+SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 import numpy as np
 from paderbox.utils.timer import timeStamped
@@ -224,5 +226,5 @@ def main(trainer_config):
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets()
-    dump_config(dict(trainer_config), storage_dir/'config.json')
+    dump_config(trainer_config, storage_dir/'config.json')
     train(train_set, validate_set)
