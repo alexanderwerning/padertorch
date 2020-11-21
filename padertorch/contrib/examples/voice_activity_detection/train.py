@@ -73,7 +73,7 @@ def config():
 
 
 @experiment.capture
-def get_datasets():
+def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params, batch_size, batches_buffer):
     db = Fearless()
     train_set = db.get_dataset_train(subset=data_subset)
     validate_set = db.get_dataset_validation(subset=data_subset)
@@ -195,7 +195,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
 
 @experiment.capture
-def get_trainer():
+def get_trainer(trainer_config, load_model_from):
     trainer = Trainer.from_config(trainer_config)
 
     checkpoint_path = trainer.checkpoint_dir / 'ckpt_latest.pth'
