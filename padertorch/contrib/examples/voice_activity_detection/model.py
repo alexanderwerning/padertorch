@@ -36,7 +36,7 @@ class SAD_Classifier(Model):
 
     def review(self, inputs, outputs):
         activity = inputs['activity']
-        bce = nn.BCELoss(reduction='none')(outputs, activity)
+        bce = nn.BCELoss(reduction='sum')(outputs, activity)
         scalar_names = [
             'true_pos_{thres}',
             'false_pos_{thres}',
