@@ -194,7 +194,8 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     return dataset
 
 
-def get_trainer(trainer_config, load_model_from):
+@experiment.capture
+def get_trainer():
     trainer = Trainer.from_config(trainer_config)
 
     checkpoint_path = trainer.checkpoint_dir / 'ckpt_latest.pth'
@@ -205,8 +206,9 @@ def get_trainer(trainer_config, load_model_from):
     return trainer
 
 
-def train(trainer_config, train_set, validate_set, load_model_from):
-    trainer = get_trainer(trainer_config, load_model_from)
+@experiment.capture
+def train(train_set, validate_set):
+    trainer = get_trainer()
     trainer.register_validation_hook(validate_set)
     trainer.test_run(train_set, validate_set)
     trainer.train(train_set)
@@ -221,4 +223,4 @@ def main():
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets(data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params)
     dump_config(trainer_config, storage_dir/'config.json')
-    train(trainer_config, train_set, validate_set, load_model_from)
+    train(train_set, validate_set)
