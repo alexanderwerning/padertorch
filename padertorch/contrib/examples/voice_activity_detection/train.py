@@ -224,5 +224,5 @@ def main(trainer_config):
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets()
-    dump_config(trainer_config, storage_dir/'config.json')
+    dump_config(dict(trainer_config), storage_dir/'config.json')
     train(train_set, validate_set)
