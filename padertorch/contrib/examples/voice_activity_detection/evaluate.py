@@ -102,7 +102,7 @@ def partition_audio(ex, segment_length, buffer_size):
     return ex
 
 
-def read_and_pad_audio(ex):
+def read_and_pad_audio(audio_reader, ex):
     ex_num_samples = ex['audio_stop_samples'] - ex['audio_start_samples']
     padding_front = abs(min(0, ex['audio_start_samples']))
     padding_back = max(0, ex['audio_stop_samples']-ex['num_samples'])
@@ -130,7 +130,7 @@ def get_data(ex):
         sub_ex_id = str(index)
         sub_ex['example_id'] = sub_ex_id
         dict_dataset[sub_ex_id] = sub_ex
-    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex), stft_params, batch_size=1, audio_reader_fn=read_and_pad_audio)
+    return prepare_dataset(lazy_dataset.new(dict_dataset), lambda ex: partition_audio(ex), stft_params, batch_size=1, audio_reader=read_and_pad_audio)
 
 
 @experiment.capture

@@ -120,7 +120,7 @@ def select_speech(example, chunk_size=30*8000):
     return example
 
 
-def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=6, train=False, audio_reader_fn=lambda x: x()):
+def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, batches_buffer=4, num_workers=6, train=False, audio_reader=None):
 
     def prepare_example(example):
         example['audio_path'] = example['audio_path']['observation']
@@ -151,8 +151,10 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         audio = x.T
         example["audio_data"] = audio
         return example
-
-    dataset = dataset.map(audio_reader_fn(read_audio))
+    if audio_reader is None:
+        dataset = dataset.map(read_audio)
+    else:
+        dataset = dataset.map(lambda ex: audio_reader(ex, read_audio))
 
     stft = STFT(**stft_params)
 
