@@ -75,8 +75,8 @@ def config():
 @experiment.capture
 def get_datasets():
     db = Fearless()
-    train_set = db.get_dataset_train(subset=subset)
-    validate_set = db.get_dataset_validation(subset=subset)
+    train_set = db.get_dataset_train(subset=data_subset)
+    validate_set = db.get_dataset_validation(subset=data_subset)
 
     training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, train=True)
     validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=8, batches_buffer=batches_buffer)
