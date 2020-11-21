@@ -57,7 +57,8 @@ def config():
         'shift': 80,
         'window_length': 200,
         'size': 256,
-        'pad': True
+        'pad': True,
+        'fading': None
     }
     sample_rate = 8000
 
