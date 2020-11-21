@@ -147,9 +147,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         start_samples = example["audio_start_samples"]
         stop_samples = example["audio_stop_samples"]
 
-        x, sr = soundfile.read(
-            audio_path, start=start_samples, stop=stop_samples, always_2d=True
-        )
+        x, sr = soundfile.read(audio_path, start=start_samples, stop=stop_samples)
         audio = x.T
         example["audio_data"] = audio
         return example
