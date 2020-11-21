@@ -69,6 +69,9 @@ def config():
 
     load_model_from = None
 
+    
+    Trainer.get_config(trainer_config)
+
 
 @experiment.capture
 def get_datasets():
@@ -211,8 +214,7 @@ def train(trainer_config, train_set, validate_set, load_model_from):
 
 
 @experiment.automain
-def main(trainer_config, batch_size, train_chunk_size, validate_chunk_size, batches_buffer, data_subset, load_model_from, ):
-    Trainer.get_config(trainer_config)
+def main():
 
     experiment.observers.append(FileStorageObserver(
         Path(trainer_config['storage_dir']) / 'sacred')
