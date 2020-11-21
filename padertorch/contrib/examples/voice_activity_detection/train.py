@@ -215,7 +215,7 @@ def train(train_set, validate_set):
 
 
 @experiment.automain
-def main(trainer_config):
+def main(trainer_config, data_subset, train_chunk_size, validate_chunk_size, batch_size, batches_buffer, stft_params):
     experiment.observers.append(FileStorageObserver(
         Path(trainer_config['storage_dir']) / 'sacred')
     )
