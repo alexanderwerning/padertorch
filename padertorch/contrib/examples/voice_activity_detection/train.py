@@ -132,8 +132,6 @@ def select_speech(example, validate_chunk_size):
 
     We evaluate the model on 30s audio segments which contain speech.
     """
-    for key in example:
-        print(key, type(example[key]))
     first_speech = example['activity'].intervals[0][0]
     max_time_buffer = 8000 * 1 # 1s
     time_buffer = np.random.randint(max_time_buffer)
