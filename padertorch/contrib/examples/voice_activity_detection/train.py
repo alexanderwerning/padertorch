@@ -99,19 +99,13 @@ def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params
 @experiment.capture
 def chunker(example, train_chunk_size, debug):
     """Cut out a random 4s segment from the stream for training."""
-    
+
     start = max(0, np.random.randint(example['num_samples'])-train_chunk_size)
 
     if debug:
-        debug_example = {}
-        # create a deep copy (at least 2 layers)
-        for key in example:
-            if type(key) not in [int, str]:
-                debug_example[key] = example[key].copy()
-            else:
-                debug_example[key] = key
+        debug_example = select_speech(example, train_chunk_size)
 
-        return [select_speech(debug_example, train_chunk_size) for _ in range((example['num_samples']-start)//train_chunk_size)]
+        return [debug_example.copy() for _ in range((example['num_samples']-start)//train_chunk_size)]
 
     examples = []
 
@@ -137,6 +131,8 @@ def select_speech(example, validate_chunk_size):
 
     We evaluate the model on 30s audio segments which contain speech.
     """
+    for key in example:
+        print(key, type(example[key]))
     first_speech = example['activity'].intervals[0][0]
     max_time_buffer = 8000 * 1 # 1s
     time_buffer = np.random.randint(max_time_buffer)
