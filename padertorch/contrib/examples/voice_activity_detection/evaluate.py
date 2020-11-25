@@ -14,6 +14,7 @@ from padertorch.contrib.examples.voice_activity_detection.train import prepare_d
 from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
 from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
 from padertorch.data import example_to_device
+from padertorch.io import load_config
 
 experiment = sacred.Experiment('VAD Evaluation')
 
@@ -165,10 +166,11 @@ def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, ):
     assert model_dir.exists(), model_dir
     config_file = (model_dir/"config.json")
     if config_file.exists():
-        model_config = load_config(model_file)
+        config = load_config(model_file)
+        model_config = config['model']
     else:
         model_config = get_model_config()
-    model = Configurable.from_config(model_config['model'])
+    model = Configurable.from_config(model_config)
     state_dict = torch.load(Path(model_dir/'checkpoints'/ckpt), map_location='cpu')['model']
     model.load_state_dict(state_dict)
     db = Fearless()
