@@ -120,7 +120,7 @@ def read_and_pad_audio(audio_reader, ex):
 
 
 @experiment.capture
-def get_data(ex):
+def get_data(ex, segment_length, stft_params, segment_length):
     num_samples = ex['num_samples']
     ex['num_samples']
     dict_dataset = {}
@@ -134,9 +134,9 @@ def get_data(ex):
 
 
 @experiment.capture
-def get_model_output(ex, model, db):
+def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
     predictions = []
-    sequence_lengths = [] 
+    sequence_lengths = []
     dataset = get_data(ex, stft_params, segment_length, buffer_size)
 
     for batch in dataset:
@@ -161,7 +161,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @experiment.automain
-def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, ):
+def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, segment_length):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
     config_file = (model_dir/"config.json")
