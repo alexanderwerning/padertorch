@@ -120,7 +120,7 @@ def read_and_pad_audio(audio_reader, ex):
 
 
 @experiment.capture
-def get_data(ex, segment_length, stft_params, segment_length):
+def get_data(ex, stft_params, segment_length):
     num_samples = ex['num_samples']
     ex['num_samples']
     dict_dataset = {}
