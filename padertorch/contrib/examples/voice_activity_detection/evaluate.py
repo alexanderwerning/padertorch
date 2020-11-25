@@ -9,7 +9,7 @@ import torch
 import lazy_dataset
 from paderbox.array import segment_axis
 from padercontrib.database.fearless import Fearless
-import padertorch.configurable.Configurable
+from padertorch.configurable import Configurable
 from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
 from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
 from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
