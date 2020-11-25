@@ -137,7 +137,7 @@ def get_data(ex, stft_params, segment_length):
 def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
     predictions = []
     sequence_lengths = []
-    dataset = get_data(ex, stft_params, segment_length, buffer_size)
+    dataset = get_data(ex)
 
     for batch in dataset:
         batch = example_to_device(batch, 'cpu')
