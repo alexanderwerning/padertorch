@@ -126,6 +126,7 @@ def chunker(example, train_chunk_size, debug):
     return examples
 
 
+@experiment.capture
 def select_speech(example, validate_chunk_size):
     """Cut out a section with speech for evaluation.
 
