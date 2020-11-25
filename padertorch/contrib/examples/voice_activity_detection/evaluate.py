@@ -102,7 +102,7 @@ def partition_audio(ex, segment_length, buffer_size):
     return ex
 
 
-def read_and_pad_audio(audio_reader, ex):
+def read_and_pad_audio(ex, audio_reader):
     ex_num_samples = ex['audio_stop_samples'] - ex['audio_start_samples']
     padding_front = abs(min(0, ex['audio_start_samples']))
     padding_back = max(0, ex['audio_stop_samples']-ex['num_samples'])
