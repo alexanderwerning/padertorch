@@ -78,7 +78,7 @@ def config():
 def debug_dataset(dataset):
     """Create a dataset containing only the first element of the given dataset."""
     first_example = dataset[0]
-    dict_dataset = {0:first_example}
+    dict_dataset = {0: first_example}
     return lazy_dataset.new(dict_dataset)
 
 @experiment.capture
@@ -101,6 +101,9 @@ def chunker(example, chunk_size, debug):
     """Cut out a random 4s segment from the stream for training."""
 
     start = max(0, np.random.randint(example['num_samples'])-chunk_size)
+
+    if debug:
+        return [select_speech(example, chunk_size) for _ in range((example['num_samples']-start)//chunk_size)]
 
     examples = []
 
