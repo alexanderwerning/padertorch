@@ -166,7 +166,7 @@ def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, ):
     assert model_dir.exists(), model_dir
     config_file = (model_dir/"config.json")
     if config_file.exists():
-        config = load_config(model_file)
+        config = load_config(config_file)
         model_config = config['model']
     else:
         model_config = get_model_config()
