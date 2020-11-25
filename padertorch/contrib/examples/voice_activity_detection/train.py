@@ -75,18 +75,29 @@ def config():
     trainer_config = Trainer.get_config(trainer_config)
 
 
+def debug_dataset(dataset):
+    """Create a dataset containing only the first element of the given dataset."""
+    first_example = dataset[0]
+    dict_dataset = {first_example}
+    return lazy_dataset.new(dict_dataset)
+
 @experiment.capture
-def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params, batch_size, batches_buffer):
+def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params, batch_size, batches_buffer, debug):
     db = Fearless()
     train_set = db.get_dataset_train(subset=data_subset)
     validate_set = db.get_dataset_validation(subset=data_subset)
+
+    if debug:
+        train_set = debug_dataset(train_set)
+        validate_set = debug_dataset(validate_set)
 
     training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, train=True)
     validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=8, batches_buffer=batches_buffer)
     return training_data, validation_data
 
 
-def chunker(example, chunk_size):
+@experiment.capture
+def chunker(example, chunk_size, debug):
     """Cut out a random 4s segment from the stream for training."""
 
     start = max(0, np.random.randint(example['num_samples'])-chunk_size)
@@ -99,7 +110,10 @@ def chunker(example, chunk_size):
         example_chunk.update(audio_start_samples=start)
         example_chunk.update(audio_stop_samples=stop)
         example_chunk.update(activity=example['activity'][start:stop])
-        examples.append(example_chunk)
+        if len(example) > 0 and debug:
+            examples.append[examples[0]]
+        else:
+            examples.append(example_chunk)
         start = stop
 
     random.shuffle(examples)
