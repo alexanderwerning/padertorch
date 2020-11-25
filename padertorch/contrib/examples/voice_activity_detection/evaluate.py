@@ -160,7 +160,7 @@ def get_binary_classification(model_out, threshold):
 
 
 @experiment.automain
-def main():
+def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, ):
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
     config_file = (model_dir/"config.json")
