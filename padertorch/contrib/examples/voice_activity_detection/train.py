@@ -91,25 +91,25 @@ def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params
         train_set = debug_dataset(train_set)
         validate_set = debug_dataset(validate_set)
 
-    training_data = prepare_dataset(train_set, lambda ex: chunker(ex, chunk_size=train_chunk_size), stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, train=True)
-    validation_data = prepare_dataset(validate_set, lambda ex: select_speech(ex, chunk_size=validate_chunk_size), stft_params, batch_size=8, batches_buffer=batches_buffer)
+    training_data = prepare_dataset(train_set, chunker, stft_params, shuffle=True, batch_size=batch_size, batches_buffer=batches_buffer, train=True)
+    validation_data = prepare_dataset(validate_set, select_speech, stft_params, batch_size=8, batches_buffer=batches_buffer)
     return training_data, validation_data
 
 
 @experiment.capture
-def chunker(example, chunk_size, debug):
+def chunker(example, train_chunk_size, debug):
     """Cut out a random 4s segment from the stream for training."""
 
-    start = max(0, np.random.randint(example['num_samples'])-chunk_size)
+    start = max(0, np.random.randint(example['num_samples'])-train_chunk_size)
 
     if debug:
-        return [select_speech(example, chunk_size) for _ in range((example['num_samples']-start)//chunk_size)]
+        return [select_speech(example, train_chunk_size) for _ in range((example['num_samples']-start)//train_chunk_size)]
 
     examples = []
 
-    for _ in range((example['num_samples']-start)//chunk_size):
+    for _ in range((example['num_samples']-start)//train_chunk_size):
         example_chunk = example.copy()
-        stop = start + chunk_size
+        stop = start + train_chunk_size
         example_chunk.update(audio_start_samples=start)
         example_chunk.update(audio_stop_samples=stop)
         example_chunk.update(activity=example['activity'][start:stop])
@@ -124,7 +124,7 @@ def chunker(example, chunk_size, debug):
     return examples
 
 
-def select_speech(example, chunk_size=30*8000):
+def select_speech(example, validate_chunk_size):
     """Cut out a section with speech for evaluation.
 
     We evaluate the model on 30s audio segments which contain speech.
@@ -133,7 +133,7 @@ def select_speech(example, chunk_size=30*8000):
     max_time_buffer = 8000 * 1 # 1s
     time_buffer = np.random.randint(max_time_buffer)
     start = max(0, first_speech-time_buffer)
-    stop = start + chunk_size
+    stop = start + validate_chunk_size
     example['audio_start_samples'] = start
     example['audio_stop_samples'] = stop
     example['activity'] = example['activity'][start:stop]
