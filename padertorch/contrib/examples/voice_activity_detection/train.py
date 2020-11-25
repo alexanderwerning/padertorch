@@ -28,7 +28,7 @@ import torch
 from torch.nn import MaxPool2d
 from paderbox.array import segment_axis
 from einops import rearrange
-
+import lazy_dataset
 import soundfile
 
 experiment_name = "sad"
