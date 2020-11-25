@@ -110,7 +110,7 @@ def chunker(example, chunk_size, debug):
         example_chunk.update(audio_start_samples=start)
         example_chunk.update(audio_stop_samples=stop)
         example_chunk.update(activity=example['activity'][start:stop])
-        if len(example) > 0 and debug:
+        if debug and len(examples) > 0:
             examples.append[examples[0]]
         else:
             examples.append(example_chunk)
