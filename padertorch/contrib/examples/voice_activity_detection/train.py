@@ -103,7 +103,15 @@ def chunker(example, train_chunk_size, debug):
     start = max(0, np.random.randint(example['num_samples'])-train_chunk_size)
 
     if debug:
-        return [select_speech(example, train_chunk_size) for _ in range((example['num_samples']-start)//train_chunk_size)]
+        debug_example = {}
+        # create a deep copy (at least 2 layers)
+        for key in example:
+            if type(key) not in [int, str]:
+                debug_example[key] = example[key].copy()
+            else:
+                debug_example[key] = key
+
+        return [select_speech(debug_example, train_chunk_size) for _ in range((example['num_samples']-start)//train_chunk_size)]
 
     examples = []
 
@@ -129,8 +137,6 @@ def select_speech(example, validate_chunk_size):
 
     We evaluate the model on 30s audio segments which contain speech.
     """
-    for key in example:
-        print(key, type(example[key]))
     first_speech = example['activity'].intervals[0][0]
     max_time_buffer = 8000 * 1 # 1s
     time_buffer = np.random.randint(max_time_buffer)
