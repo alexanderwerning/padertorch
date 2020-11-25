@@ -99,7 +99,8 @@ def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params
 @experiment.capture
 def chunker(example, train_chunk_size, debug):
     """Cut out a random 4s segment from the stream for training."""
-
+    for key in example:
+        print(key, type(example[key]))
     start = max(0, np.random.randint(example['num_samples'])-train_chunk_size)
 
     if debug:
