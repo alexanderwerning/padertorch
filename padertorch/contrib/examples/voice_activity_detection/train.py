@@ -247,5 +247,6 @@ def main(trainer_config):
     storage_dir = Path(trainer_config['storage_dir'])
     os.makedirs(storage_dir, exist_ok=True)
     train_set, validate_set = get_datasets()
+    print('len train', len(train_set), 'len validate', len(validate_set))
     dump_config(trainer_config, storage_dir/'config.json')
     train(train_set, validate_set)
