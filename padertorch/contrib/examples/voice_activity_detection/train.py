@@ -104,8 +104,9 @@ def chunker(example, train_chunk_size, debug):
 
     if debug:
         debug_example = select_speech(example, train_chunk_size)
-
-        return [debug_example.copy() for _ in range((example['num_samples']-start)//train_chunk_size)]
+        examples = [debug_example.copy() for _ in range((example['num_samples']-start)//train_chunk_size)]
+        print('len', len(examples), 'ex', examples[2])
+        return examples
 
     examples = []
 
