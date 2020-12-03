@@ -57,7 +57,6 @@ class SAD_Classifier(Model):
             keys = [name.format(thres=thres) for name in scalar_names]
             values = [tp, fp, tn, fn]
             results.update(zip(keys, values))
-            results.update({"total": tp+fp+tn+fn})
 
         summary = dict(
             loss=bce.sum(),
@@ -91,4 +90,5 @@ class SAD_Classifier(Model):
                 summary['scalars'][f'recall_{thres}'] = r
                 summary['scalars'][f'f1_{thres}'] = 2*(p*r)/(p+r)
                 summary['scalars'][f'dcf_{thres}'] = 0.75 * pfn + 0.25 * pfp
+                summary['scalars'][f'total_{thres}'] = tp+fp+tn+fn
         return summary
