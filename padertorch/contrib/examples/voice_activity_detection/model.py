@@ -57,6 +57,7 @@ class SAD_Classifier(Model):
             keys = [name.format(thres=thres) for name in scalar_names]
             values = [tp, fp, tn, fn]
             results.update(zip(keys, values))
+            results.update({"total": tp+fp+tn+fn})
 
         summary = dict(
             loss=bce.sum(),

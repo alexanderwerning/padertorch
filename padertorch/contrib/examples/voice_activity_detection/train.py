@@ -106,7 +106,6 @@ def chunker(example, train_chunk_size, debug):
 
     if debug:
         debug_example = select_speech(example, train_chunk_size)
-        print(debug_example["activity"])
         examples = [deepcopy(debug_example) for _ in range((example['num_samples']-start)//train_chunk_size)]
         return examples
 
@@ -144,7 +143,6 @@ def select_speech(example, validate_chunk_size, sample_rate, debug, time_buffer_
         max_time_buffer = sample_rate * time_buffer_sec * 10
         time_buffer = max_time_buffer
     start = max(0, first_speech-time_buffer)
-    print(f"FIRST SPEECH: {first_speech}")
     stop = start + validate_chunk_size
     example['audio_start_samples'] = start
     example['audio_stop_samples'] = stop
