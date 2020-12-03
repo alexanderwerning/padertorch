@@ -138,6 +138,7 @@ def select_speech(example, validate_chunk_size, sample_rate, time_buffer_sec=1):
     max_time_buffer = sample_rate * time_buffer_sec  # 1s
     time_buffer = np.random.randint(max_time_buffer)
     start = max(0, first_speech-time_buffer)
+    print(f"START: {start}")
     stop = start + validate_chunk_size
     example['audio_start_samples'] = start
     example['audio_stop_samples'] = stop
