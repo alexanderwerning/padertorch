@@ -77,7 +77,7 @@ def config():
 
 def debug_dataset(dataset):
     """Create a dataset containing only the first element of the given dataset."""
-    first_example = dataset[0]
+    first_example = dataset[1]  # this example does not immediately start with activity
     dict_dataset = {index: first_example.copy() for index in range(len(dataset))}
     return lazy_dataset.new(dict_dataset)
 
