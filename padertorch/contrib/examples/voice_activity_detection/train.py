@@ -78,8 +78,9 @@ def config():
 def debug_dataset(dataset):
     """Create a dataset containing only the first element of the given dataset."""
     first_example = dataset[0]
-    dict_dataset = {0: first_example}
+    dict_dataset = {index: first_example.copy() for index in range(len(dataset))}
     return lazy_dataset.new(dict_dataset)
+
 
 @experiment.capture
 def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params, batch_size, batches_buffer, debug):
@@ -105,7 +106,6 @@ def chunker(example, train_chunk_size, debug):
     if debug:
         debug_example = select_speech(example, train_chunk_size)
         examples = [debug_example.copy() for _ in range((example['num_samples']-start)//train_chunk_size)]
-        print('len', len(examples), 'ex', examples[2])
         return examples
 
     examples = []
@@ -134,7 +134,7 @@ def select_speech(example, validate_chunk_size):
     We evaluate the model on 30s audio segments which contain speech.
     """
     first_speech = example['activity'].intervals[0][0]
-    max_time_buffer = 8000 * 1 # 1s
+    max_time_buffer = 8000 * 1  # 1s
     time_buffer = np.random.randint(max_time_buffer)
     start = max(0, first_speech-time_buffer)
     stop = start + validate_chunk_size
@@ -162,7 +162,6 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
         dataset = dataset.unbatch()
 
     buffer_size = int(batches_buffer * batch_size)
-
 
     def read_audio(example):
         audio_path = str(example["audio_path"])
