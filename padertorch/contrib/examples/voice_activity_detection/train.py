@@ -8,6 +8,7 @@ import random
 import json
 import os
 from pathlib import Path
+from copy import deepcopy
 
 from sacred import Experiment
 from sacred.observers.file_storage import FileStorageObserver
@@ -106,7 +107,7 @@ def chunker(example, train_chunk_size, debug):
     if debug:
         debug_example = select_speech(example, train_chunk_size, time_buffer_sec=10)
         print(debug_example["activity"])
-        examples = [debug_example.copy() for _ in range((example['num_samples']-start)//train_chunk_size)]
+        examples = [deepcopy(debug_example) for _ in range((example['num_samples']-start)//train_chunk_size)]
         return examples
 
     examples = []
