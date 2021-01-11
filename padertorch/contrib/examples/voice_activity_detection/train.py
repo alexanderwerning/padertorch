@@ -87,7 +87,7 @@ def debug_dataset(dataset):
 
 
 @experiment.capture
-def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params, batch_size, batches_buffer, debug):
+def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params, batch_size, debug):
     """Initialize the dataset objects."""
     db = Fearless()
     train_set = db.get_dataset_train(subset=data_subset)
