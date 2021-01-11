@@ -67,7 +67,7 @@ def config():
     sample_rate = 8000
 
     debug = False
-    batch_size = 64
+    batch_size = 32
     train_chunk_size = 4 * sample_rate
     validate_chunk_size = 30 * sample_rate
 
@@ -105,13 +105,13 @@ def get_datasets(data_subset, train_chunk_size, validate_chunk_size, stft_params
 
 
 @experiment.capture
-def chunker(example, train_chunk_size, debug):
+def chunker(example, train_chunk_size):
     """Cut a batch of 4s segments from the stream for training."""
     examples = []
 
     boundaries = get_segment_boundaries(example['num_samples'], train_chunk_size, train_chunk_size, anchor='random')
 
-    for start, stop in np.nditer(boundaries, op_axes=0):
+    for start, stop in boundaries:
         example_chunk = example.copy()
         example_chunk.update(audio_start_samples=start)
         example_chunk.update(audio_stop_samples=stop)
