@@ -1,17 +1,17 @@
+import json
 import math
 from pathlib import Path
-import json
 
 import dlp_mpi
+import lazy_dataset
 import numpy as np
 import sacred
 import torch
-import lazy_dataset
 from paderbox.array import segment_axis
 from padercontrib.database.fearless import Fearless
 from padertorch.configurable import Configurable
-from padertorch.contrib.examples.voice_activity_detection.train import prepare_dataset
-from padertorch.contrib.examples.voice_activity_detection.train import get_model_config
+from padertorch.contrib.examples.voice_activity_detection.train import (
+    get_model_config, prepare_dataset)
 from padertorch.contrib.jensheit.eval_sad import evaluate_model, smooth_vad
 from padertorch.data import example_to_device
 from padertorch.io import load_config
@@ -92,7 +92,8 @@ def config():
 
 @experiment.capture
 def partition_audio(ex, segment_length, buffer_size):
-    num_samples = ex['num_samples']
+    """Trim a given example to segment assigned to it via its 'index' attribute.
+    The segment is extended by a buffer on both sides. Exceeding the example length or its beginning is possible."""
     index = ex['index']
     start = index * segment_length
     stop = start + segment_length
@@ -103,6 +104,9 @@ def partition_audio(ex, segment_length, buffer_size):
 
 
 def read_and_pad_audio(ex, audio_reader):
+    """Read the audio and fix issues with the padding.
+    If a example exceeds the available samples with its buffer, the overlap is padded with zeros to ensure all examples have exactly the same amount of samples.
+    """
     ex_num_samples = ex['audio_stop_samples'] - ex['audio_start_samples']
     padding_front = abs(min(0, ex['audio_start_samples']))
     padding_back = max(0, ex['audio_stop_samples']-ex['num_samples'])
@@ -121,6 +125,10 @@ def read_and_pad_audio(ex, audio_reader):
 
 @experiment.capture
 def get_data(ex, stft_params, segment_length):
+    """Convert a single example with a stream into a new dataset with small segments of the stream to be used for evaluation.
+    This function proceeds by duplicating the given example repeatedly, giving each duplicate an incrementing index.
+    We then re-use the 'prepare_dataset' function to trim down the duplicated examples to their respective segments via the 'partition_audio' function.
+    """
     num_samples = ex['num_samples']
     ex['num_samples']
     dict_dataset = {}
@@ -135,6 +143,8 @@ def get_data(ex, stft_params, segment_length):
 
 @experiment.capture
 def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
+    """Feed each batch from the dataset into the model and convert the results back from frequency to time domain.
+    The buffer added when the original stream was partitioned is removed from the model output."""
     predictions = []
     sequence_lengths = []
     dataset = get_data(ex)
@@ -153,6 +163,7 @@ def get_model_output(ex, model, db, stft_params, segment_length, buffer_size):
 
 
 def get_binary_classification(model_out, threshold):
+    """Smoothen the model output to be more forgiving when evaluating it."""
     vad = list()
     for prediction in model_out:
         smoothed_vad = smooth_vad(prediction, threshold=threshold)
@@ -162,6 +173,7 @@ def get_binary_classification(model_out, threshold):
 
 @experiment.automain
 def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, segment_length):
+    # load model config and checkpoint
     model_dir = Path(model_dir).resolve().expanduser()
     assert model_dir.exists(), model_dir
     config_file = (model_dir/"config.json")
@@ -173,15 +185,17 @@ def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, segment_length)
     model = Configurable.from_config(model_config)
     state_dict = torch.load(Path(model_dir/'checkpoints'/ckpt), map_location='cpu')['model']
     model.load_state_dict(state_dict)
-    db = Fearless()
+
     model.eval()
+    db = Fearless()
 
     def get_target_fn(ex):
-        padded_length = segment_length*(math.ceil(ex['num_samples'] / segment_length))
+        padded_length = segment_length * (math.ceil(ex['num_samples'] / segment_length))
         per_sample_vad = np.zeros(padded_length)
         per_sample_vad[:ex['num_samples']] = db.get_activity(ex)[:]
         return per_sample_vad
 
+    # evaluation
     with torch.no_grad():
         tp_fp_tn_fn = evaluate_model(
             db.get_dataset_validation(subset),
@@ -191,6 +205,8 @@ def main(model_dir, out_dir, num_ths, buffer_zone, ckpt, subset, segment_length)
             num_thresholds=num_ths,
             buffer_zone=buffer_zone
         )
+
+    # write results to file
     if dlp_mpi.IS_MASTER:
         if out_dir is None:
             out_dir = model_dir
