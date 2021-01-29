@@ -142,7 +142,8 @@ def select_speech(example, validate_chunk_size, sample_rate, debug, time_buffer_
     example['audio_start_samples'] = start
     example['audio_stop_samples'] = stop
     example['activity'] = example['activity'][start:stop]
-    return example
+    # return a batch with one example
+    return [example]
 
 
 def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, batch_size=8, num_workers=6, train=False, audio_reader=None):
@@ -188,7 +189,6 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     # default audio reader
     def read_audio(example):
         """Read the audio from the given path according to the selected samples."""
-        print(example)
         audio_path = str(example["audio_path"])
         start_samples = example["audio_start_samples"]
         stop_samples = example["audio_stop_samples"]
