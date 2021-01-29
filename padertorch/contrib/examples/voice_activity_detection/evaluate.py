@@ -100,7 +100,8 @@ def partition_audio(ex, segment_length, buffer_size):
 
     ex['audio_start_samples'] = start - buffer_size
     ex['audio_stop_samples'] = stop + buffer_size
-    return ex
+    # return batch with one example
+    return [ex]
 
 
 def read_and_pad_audio(ex, audio_reader):

@@ -240,9 +240,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     dataset = dataset.prefetch(num_workers, prefetch_buffer)
 
-    # unbatch if we are training (otherwise there are no batches)
-    if train:
-        dataset = dataset.unbatch()
+    dataset = dataset.unbatch()
 
     # create batches and stack vectors
     dataset = dataset.batch(batch_size).map(collate_fn)
