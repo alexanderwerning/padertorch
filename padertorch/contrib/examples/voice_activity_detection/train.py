@@ -188,6 +188,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     # default audio reader
     def read_audio(example):
         """Read the audio from the given path according to the selected samples."""
+        print(example)
         audio_path = str(example["audio_path"])
         start_samples = example["audio_start_samples"]
         stop_samples = example["audio_stop_samples"]
