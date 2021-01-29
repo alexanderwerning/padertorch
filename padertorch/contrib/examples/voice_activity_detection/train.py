@@ -185,10 +185,6 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     # when evaluating, this does not result in batches, but single examples
     dataset = dataset.map(audio_segmentation)
 
-    # unbatch if we are training (otherwise there are no batches)
-    if train:
-        dataset = dataset.unbatch()
-
     # default audio reader
     def read_audio(example):
         """Read the audio from the given path according to the selected samples."""
@@ -204,9 +200,9 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
 
     # read audio file into examples
     if audio_reader is None:
-        dataset = dataset.map(read_audio)
+        dataset = dataset.batch_map(read_audio)
     else:
-        dataset = dataset.map(lambda ex: audio_reader(ex, read_audio))
+        dataset = dataset.batch_map(lambda ex: audio_reader(ex, read_audio))
 
     # apply stft to audio
     stft = STFT(**stft_params)
@@ -226,7 +222,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
                                            ).any(axis=-1)
         return example
 
-    dataset = dataset.map(calculate_stft)
+    dataset = dataset.batch_map(calculate_stft)
 
     # renaming and typecasting
     def finalize(example):
@@ -238,7 +234,15 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
             'activity_samples': example['activity_samples'][:].astype(np.float32)
         }
 
-    dataset = dataset.map(finalize)
+    dataset = dataset.batch_map(finalize)
+
+    prefetch_buffer = 8
+
+    dataset = dataset.prefetch(num_workers, prefetch_buffer)
+
+    # unbatch if we are training (otherwise there are no batches)
+    if train:
+        dataset = dataset.unbatch()
 
     # create batches and stack vectors
     dataset = dataset.batch(batch_size).map(collate_fn)
