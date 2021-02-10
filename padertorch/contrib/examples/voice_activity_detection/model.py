@@ -32,7 +32,9 @@ class SAD_Classifier(Model):
         x = self.pooling(x)
         x = x.squeeze(1)
         x = self.activation(x)
-        return x
+        output_len = x.shape[-1]
+        scale_factor = np.ceil(seq_len/output_len)
+        return np.repeat(x, scale_factor, axis=x.shape-1)[:, :seq_len]
 
     def review(self, inputs, outputs):
         activity = inputs['activity']

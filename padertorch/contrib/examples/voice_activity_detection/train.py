@@ -205,7 +205,7 @@ def prepare_dataset(dataset, audio_segmentation, stft_params, shuffle=False, bat
     else:
         dataset = dataset.batch_map(lambda ex: audio_reader(ex, read_audio))
 
-    # apply stft to audio
+    # apply stft to audio 
     stft = STFT(**stft_params)
 
     def calculate_stft(example):
