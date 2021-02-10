@@ -33,7 +33,7 @@ class SAD_Classifier(Model):
         x = x.squeeze(1)
         x = self.activation(x)
         output_len = x.shape[-1]
-        scale_factor = np.ceil(seq_len/output_len)
+        scale_factor = np.ceil(seq_len/output_len).astype(np.uint32)
         return torch.repeat_interleave(x, scale_factor, dim=len(x.shape)-1)[:, :seq_len]
 
     def review(self, inputs, outputs):
