@@ -34,7 +34,7 @@ class SAD_Classifier(Model):
         x = self.activation(x)
         output_len = x.shape[-1]
         scale_factor = np.ceil(seq_len/output_len)
-        return np.repeat(x, scale_factor, axis=len(x.shape)-1)[:, :seq_len]
+        return torch.repeat_interleave(x, scale_factor, axis=len(x.shape)-1)[:, :seq_len]
 
     def review(self, inputs, outputs):
         activity = inputs['activity']
