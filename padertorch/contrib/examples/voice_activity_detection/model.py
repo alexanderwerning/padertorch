@@ -25,7 +25,7 @@ class SAD_Classifier(Model):
 
     def forward(self, batch: dict):
         x = batch['features']
-        seq_len = batch['seq_len']
+        seq_len = x.shape[-1]
         x, seq_len = self.conv_layer(x)
         x = x.squeeze(2)
         x, seq_len = self.temporal_layer(x)
