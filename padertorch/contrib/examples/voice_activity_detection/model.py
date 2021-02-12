@@ -1,5 +1,5 @@
 import numpy as np
-from padertorch.contrib.examples.voice_activity_detection.evaluate import activity_frequency_to_time
+from padertorch.contrib.examples.voice_activity_detection.segment import activity_frequency_to_time
 from padertorch.contrib.je.modules.conv import CNN1d, CNN2d
 from padertorch.base import Model
 import torch
