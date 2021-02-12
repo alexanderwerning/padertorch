@@ -1,4 +1,5 @@
 import numpy as np
+from padertorch.contrib.examples.voice_activity_detection.evaluate import activity_frequency_to_time
 from padertorch.contrib.je.modules.conv import CNN1d, CNN2d
 from padertorch.base import Model
 import torch
@@ -33,8 +34,9 @@ class SAD_Classifier(Model):
         x = x.squeeze(1)
         x = self.activation(x)
         output_len = x.shape[-1]
-        scale_factor = np.ceil(seq_len/output_len).astype(np.uint32)
-        return torch.repeat_interleave(x, scale_factor, dim=len(x.shape)-1)[:, :seq_len]
+        # scale_factor = np.ceil(seq_len/output_len).astype(np.uint32)
+        # return torch.repeat_interleave(x, scale_factor, dim=len(x.shape)-1)[:, :seq_len]
+        return activity_frequency_to_time(x, self.pooling.kernel[1], self.pooling.stride[1], seq_len)
 
     def review(self, inputs, outputs):
         activity = inputs['activity']
