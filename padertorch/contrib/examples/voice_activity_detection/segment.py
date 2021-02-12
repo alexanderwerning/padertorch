@@ -9,11 +9,7 @@ def activity_frequency_to_time(
         stft_shift,
         time_length=None,
 ):
-
-
-    frequency_activity = torch.broadcast_to(
-        frequency_activity[..., None], (*frequency_activity.size(), stft_window_length)
-    )
+    frequency_activity[..., None].expand((*frequency_activity.size(), stft_window_length))
 
     time_activity = torch.zeros(
         (*frequency_activity.size()[:-2],
