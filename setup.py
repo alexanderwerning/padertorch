@@ -11,9 +11,9 @@ from codecs import open
 from distutils.core import setup
 from os import path
 
-import numpy
+# import numpy
 from setuptools import find_packages
-from Cython.Build import cythonize
+# from Cython.Build import cythonize
 
 here = path.abspath(path.dirname(__file__))
 
@@ -32,6 +32,10 @@ test = [
     'protobuf3_to_dict',
     'torchvision',
     'matplotlib',  # padertorch.summary.tbx_utils use mpl for colorize
+    'pb_bss @ git+http://github.com/fgnt/pb_bss',
+    'torch_complex',  # https://github.com/kamo-naoyuki/pytorch_complex
+    'pyyaml',
+    'humanize',
 ]
 
 setup(
@@ -110,13 +114,13 @@ setup(
     # for example:
     # $ pip install -e .[dev,test]
     extras_require={
-        'dev': ['check-manifest'],
         'test': test,
+        'all': test,
     },
 
-    ext_modules=cythonize(
-        [],
-        annotate=True,
-    ),
-    include_dirs=[numpy.get_include()],
+    # ext_modules=cythonize(
+    #     [],
+    #     annotate=True,
+    # ),
+    # include_dirs=[numpy.get_include()],
 )

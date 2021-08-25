@@ -18,6 +18,7 @@ used for that instance in your modified `finalize_docmatic_config`.
 import sys
 import os
 import collections
+import functools
 import importlib
 import inspect
 from pathlib import Path
@@ -26,6 +27,7 @@ import copy
 import paderbox as pb
 
 # pylint: disable=import-outside-toplevel
+
 
 class Configurable:
     """Allow subclasses to be configured automatically from JSON config files.
@@ -141,7 +143,9 @@ class Configurable:
          'linear': {'factory': 'torch.nn.modules.linear.Linear',
           'in_features': 5,
           'out_features': 3,
-          'bias': True},
+          'bias': True,
+          'device': None,
+          'dtype': None},
          'activation': {'factory': 'torch.nn.modules.activation.ReLU',
           'inplace': False}}
         >>> CustomizableDenseLayer.from_config(config)
@@ -179,7 +183,9 @@ class Configurable:
           'in1_features': 10,
           'in2_features': 15,
           'out_features': 3,
-          'bias': True},
+          'bias': True,
+          'device': None,
+          'dtype': None},
          'activation': {'factory': 'torch.nn.modules.activation.ReLU',
           'inplace': False}}
         >>> CustomizableDenseLayer.from_config(config)
@@ -190,6 +196,58 @@ class Configurable:
 
     Another use case for this behaviour are depended config entries (e.g.
     NN input size depends on selected input features).
+
+    Some modules need unitilized classes or functions as an input.
+    Factory already supports functions but cannot make them json
+    serializable.
+    Therefore, one can use the partial key instead of the factory key.
+    All defined kwargs will overwrite the defaults without calling the function
+    or initializing the class using partial.
+    This is essentially a `functools.partial` call.
+    One usecase is SpeechBrain which requires the activity to be not
+    initialized at the class input.
+
+        >>> class SBDenseLayer(Configurable, torch.nn.Module):
+        ...     @classmethod
+        ...     def finalize_dogmatic_config(cls, config):
+        ...         config['linear'] = {
+        ...             'factory': torch.nn.Linear,
+        ...             'out_features': 3,
+        ...         }
+        ...         if config['linear']['factory'] == torch.nn.Linear:
+        ...             config['linear']['in_features'] = 5
+        ...         config['activation'] = {'partial': torch.nn.ReLU,}
+        ...         config['linear_2'] = {'partial': torch.nn.Linear,
+        ...                               'in_features': 3}
+        ...     def __init__(self, linear, linear_2, activation):
+        ...         super().__init__()
+        ...         self.l = linear  # torch.nn.Linear(in_units, out_units)
+        ...         self.l2 = linear_2(out_features=10)
+        ...         self.a = activation()  # torch.nn.ReLU()
+        ...     def __call__(self, x):
+        ...         return self.l2(self.a(self.l(x)))
+        >>> config = SBDenseLayer.get_config()
+        >>> pprint(config)
+        {'factory': 'padertorch.configurable.SBDenseLayer',
+         'linear': {'factory': 'torch.nn.modules.linear.Linear',
+          'in_features': 5,
+          'out_features': 3,
+          'bias': True,
+          'device': None,
+          'dtype': None},
+         'linear_2': {'partial': 'torch.nn.modules.linear.Linear',
+          'in_features': 3,
+          'bias': True,
+          'device': None,
+          'dtype': None},
+         'activation': {'partial': 'torch.nn.modules.activation.ReLU',
+          'inplace': False}}
+        >>> SBDenseLayer.from_config(config)
+        SBDenseLayer(
+          (l): Linear(in_features=5, out_features=3, bias=True)
+          (l2): Linear(in_features=3, out_features=10, bias=True)
+          (a): ReLU()
+        )
 
     # TODO: This text ist outdated and needs to be reformulated
     # The values in the config are enforced to have the updated value.
@@ -325,15 +383,20 @@ class Configurable:
         else:
             config = _sacred_dogmatic_to_dict(updates)
 
-        if 'factory' not in config:
-            config['factory'] = cls
-        else:
+        if 'factory' in config:
             config['factory'] = import_class(config['factory'])
             if inspect.isclass(config['factory']) \
                     and issubclass(config['factory'], Configurable):
                 # When subclass of Configurable expect proper subclass
-                assert issubclass(import_class(config['factory']), cls), (
+                assert issubclass(config['factory'], cls), (
                     config['factory'], cls)
+        # If get_config has to be called on a partial object,
+        # you can use this
+        # elif 'partial' in config:
+        #     config['partial'] = import_class(config['partial'])
+        #     assert callable(config['partial']), config['partial']
+        else:
+            config['factory'] = cls
 
         config = _DogmaticConfig.normalize(config)
 
@@ -523,18 +586,26 @@ def fix_doctext_import_class(locals_dict):
         >>> import_class(class_to_str(Foo))  # doctest: +ELLIPSIS
         Traceback (most recent call last):
         ...
-        AttributeError: Module ...configurable... has no attribute Foo. ...
+        ImportError: Could not import 'Foo' from '...configurable',
+        because module '...configurable' has no attribute 'Foo'
+        <BLANKLINE>
+        Make sure that
+         1. This is the class you want to import.
+         2. You activated the right environment.
+         3. The module exists and has been installed with pip.
+         4. You can import the module (and class) in ipython.
+        <BLANKLINE>
         >>> fix_doctext_import_class(locals())
-        >>> class_to_str(Foo)
-        'padertorch.configurable.Foo'
-        >>> class_to_str(foo)
-        'padertorch.configurable.foo'
-        >>> Foo
-        <class 'padertorch.configurable.Foo'>
+        >>> class_to_str(Foo)  # doctest: +ELLIPSIS
+        '...configurable.Foo'
+        >>> class_to_str(foo)  # doctest: +ELLIPSIS
+        '...configurable.foo'
+        >>> Foo  # doctest: +ELLIPSIS
+        <class '...configurable.Foo'>
         >>> import_class(class_to_str(foo)) == foo
         True
-        >>> import_class(class_to_str(Foo))
-        <class 'padertorch.configurable.Foo'>
+        >>> import_class(class_to_str(Foo))  # doctest: +ELLIPSIS
+        <class '...configurable.Foo'>
     """
     cache = {}
     cls_cache = {}
@@ -594,7 +665,7 @@ def fix_doctext_import_class(locals_dict):
     globals()['class_to_str'] = class_to_str_fix
 
 
-def import_class(name: str):
+def import_class(name: [str, callable]):
     """Import the str and return the imported object.
 
     Opposite of class_to_str.
@@ -602,36 +673,94 @@ def import_class(name: str):
     >>> import padertorch
     >>> import_class(padertorch.Model)
     <class 'padertorch.base.Model'>
-    >>> import_class('padertorch.Model')
+    >>> import_class('padertorch.base.Model')
     <class 'padertorch.base.Model'>
+    >>> import_class(padertorch.Model.from_file)
+    <bound method Configurable.from_file of <class 'padertorch.base.Model'>>
+    >>> import_class('padertorch.Model.from_file')
+    <bound method Configurable.from_file of <class 'padertorch.base.Model'>>
+    >>> import_class('padertorch.Model.typo')
+    Traceback (most recent call last):
+    ...
+    ImportError: Could not import 'Model.typo' from 'padertorch',
+    because type object 'Model' has no attribute 'typo'
+    <BLANKLINE>
+    Make sure that
+     1. This is the class you want to import.
+     2. You activated the right environment.
+     3. The module exists and has been installed with pip.
+     4. You can import the module (and class) in ipython.
+    <BLANKLINE>
+    >>> import_class('padertorch.base.typo')
+    Traceback (most recent call last):
+    ...
+    ImportError: Could not import 'typo' from 'padertorch.base',
+    because module 'padertorch.base' has no attribute 'typo'
+    <BLANKLINE>
+    Make sure that
+     1. This is the class you want to import.
+     2. You activated the right environment.
+     3. The module exists and has been installed with pip.
+     4. You can import the module (and class) in ipython.
+    <BLANKLINE>
+    >>> import_class('typo.in.pkg.name')
+    Traceback (most recent call last):
+    ...
+    ImportError: Could not import 'typo.in.pkg.name'.
+    <BLANKLINE>
+    Make sure that
+     1. This is the class you want to import.
+     2. You activated the right environment.
+     3. The module exists and has been installed with pip.
+     4. You can import the module (and class) in ipython.
+    <BLANKLINE>
 
     """
     if not isinstance(name, str):
+        if not callable(name):
+            raise TypeError(
+                'expects string or callcable but got', type(name), name)
         return name
+
+    if '.' not in name:
+        name = '__main__.' + name
+
     splitted = name.split('.')
-    module_name = '.'.join(splitted[:-1])
-    if module_name == '':
-        module_name = '__main__'
-    try:
-        module = importlib.import_module(module_name)
-    except ModuleNotFoundError:
-        print(
-            f'Tried to import module {module_name} to import class '
-            f'{splitted[-1]}. During import an error happened. '
-            f'Make sure that\n'
-            f'\t1. This is the class you want to import.\n'
-            f'\t2. You activated the right environment.\n'
-            f'\t3. The module exists and has been installed with pip.\n'
-            f'\t4. You can import the module (and class) in ipython.\n'
-        )
-        raise
-    try:
-        return getattr(module, splitted[-1])
-    except AttributeError as ex:
-        raise AttributeError(
-            f'Module {module} has no attribute {splitted[-1]}.'
-            f' Original: {ex!r}'
-        )
+
+    for i in reversed(range(1, len(splitted))):
+        module_name = '.'.join(splitted[:i])
+        try:
+            module = importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            continue
+
+        qualname = splitted[i:]
+        cls = module
+        for part in qualname:
+            try:
+                cls = getattr(cls, part)
+            except AttributeError as e:
+                qualname = '.'.join(qualname)
+                raise ImportError(
+                    f'Could not import {qualname!r} from {module_name!r},\n'
+                    f'because {e}\n\n'
+                    f'Make sure that\n'
+                    f' 1. This is the class you want to import.\n'
+                    f' 2. You activated the right environment.\n'
+                    f' 3. The module exists and has been installed with pip.\n'
+                    f' 4. You can import the module (and class) in ipython.\n'
+                ) from None
+
+        return cls
+
+    raise ImportError(
+        f'Could not import {name!r}.\n\n'
+        f'Make sure that\n'
+        f' 1. This is the class you want to import.\n'
+        f' 2. You activated the right environment.\n'
+        f' 3. The module exists and has been installed with pip.\n'
+        f' 4. You can import the module (and class) in ipython.\n'
+    )
 
 
 def get_module_name_from_file(file):
@@ -776,27 +905,58 @@ def class_to_str(cls, fix_module=False):
         return f'{cls.__qualname__}'
 
 
-def recursive_class_to_str(config):
+def recursive_class_to_str(config, sort=False):
     """
-    Ensures that all factory values are strings.
+    Ensures that factory and partial values are strings.
 
     The config that is returned from a configurable already takes care, that
-    all factory values are strings. But when sacred overwrites a factory values
-    with a class and not the str, the config will contain a class instead of
-    the corresponding string.
+    all factory and partial values are strings. But when sacred overwrites a
+    factory values with a class and not the str, the config will contain a
+    class instead of the corresponding string.
 
     Args:
         config:
 
     Returns: config where each factory value is a str.
 
+    >>> import torch.nn
+    >>> cfg = {'factory': torch.nn.Linear, 'in_features': 1, 'out_features': 2}
+    >>> recursive_class_to_str(cfg, sort=True)
+    {'factory': 'torch.nn.modules.linear.Linear', 'in_features': 1, 'out_features': 2}
+    >>> cfg = {'factory': torch.nn.Linear, 'out_features': 2, 'in_features': 1}
+    >>> recursive_class_to_str(cfg, sort=True)
+    {'factory': 'torch.nn.modules.linear.Linear', 'in_features': 1, 'out_features': 2}
+    >>> cfg = {'out_features': 2, 'in_features': 1, 'factory': torch.nn.Linear}
+    >>> recursive_class_to_str(cfg, sort=True)
+    {'factory': 'torch.nn.modules.linear.Linear', 'in_features': 1, 'out_features': 2}
+    >>> cfg = {'partial': torch.nn.LeakyReLU, 'negative_slope': 0.01, 'inplace': False}
+    >>> recursive_class_to_str(cfg, sort=True)
+    {'partial': 'torch.nn.modules.activation.LeakyReLU', 'negative_slope': 0.01, 'inplace': False}
+    >>> cfg = {'partial': torch.nn.LeakyReLU, 'inplace': False, 'negative_slope': 0.01}
+    >>> recursive_class_to_str(cfg, sort=True)
+    {'partial': 'torch.nn.modules.activation.LeakyReLU', 'negative_slope': 0.01, 'inplace': False}
+    >>> cfg = {'inplace': False, 'negative_slope': 0.01, 'partial': torch.nn.LeakyReLU}
+    >>> recursive_class_to_str(cfg, sort=True)
+    {'partial': 'torch.nn.modules.activation.LeakyReLU', 'negative_slope': 0.01, 'inplace': False}
+
     """
     # ToDo: Support tuple and list?
     if isinstance(config, dict):
-
         d = config.__class__()
+        special_key = _get_special_key(config)
+
+        if sort and special_key:
+            # Force the special key to be the first key
+            d[special_key] = None  # will be set later
+            imported = import_class(config[special_key])
+            arg_names = inspect.signature(imported).parameters.keys()
+            # This ensure that the keys are in the same order as the signature
+            for k in arg_names:
+                if k in config:
+                    d[k] = None  # will be set later
+
         for k, v in config.items():
-            if k == 'factory':
+            if special_key and k == special_key:
                 d[k] = class_to_str(v)
             else:
                 d[k] = recursive_class_to_str(v)
@@ -809,27 +969,170 @@ def recursive_class_to_str(config):
         return config
 
 
-def _split_factory_kwargs(config):
+def _split_factory_kwargs(config, key='factory'):
     kwargs = config.copy()
-    factory = kwargs.pop('factory')
+    factory = kwargs.pop(key)
     return factory, kwargs
 
 
-def config_to_instance(config):
+def _get_special_key(config):
+    # These special keys are used in the config to indicate a class or
+    # function. 'factory' is used to specify initialized classes or
+    # function outputs as an input. 'partial' is used if an input is a
+    # non-initialized class or a functions
+    for key in ['factory', 'partial']:
+        if key in config.keys():
+            return key
+    return None
+
+
+def _check_factory_signature_and_kwargs(factory, kwargs, strict, special_key):
+    sig = inspect.signature(factory)
+    # Remove annotation, sometimes they are to verbose and in python
+    # 3.7 they changed the `__str__` function, when an annotation is
+    # known (e.g. '(inplace:bool)' -> '(inplace: bool)').
+    # This breaks doctests across python versions.
+    sig = sig.replace(
+        parameters=[p.replace(
+            annotation=inspect.Parameter.empty
+        ) for p in sig.parameters.values()]
+    )
+
+    # Define key specific check_func since factory requires all keys of the
+    # signature to be specified in kwargs whereas partial only requires the
+    # keys in kwargs to be in the signature.
+    if special_key == 'factory':
+        check_func = sig.bind
+    elif special_key == 'partial':
+        check_func = sig.bind_partial
+    else:
+        raise ValueError(special_key)
+    try:
+        # With sig.bind we ensure, that the "bind" here raises the
+        # exception. Using the factory(**kwargs) may raise TypeError
+        # with another cause. The overhead doesn't matter here.
+        bound_arguments: inspect.BoundArguments = check_func(**kwargs)
+    except TypeError as e:
+        raise TypeError(
+            f'{e}\n'
+            f'Tried to instantiate/call {factory} with\n'
+            f'`{class_to_str(factory)}(**{kwargs})`.\n'
+            f'Signature: {sig}'
+        ) from e
+
+    if strict:
+        sig = sig.replace(
+            parameters=[p.replace(
+                default=inspect.Parameter.empty
+            ) for p in sig.parameters.values()]
+        )
+        try:
+            bound_arguments: inspect.BoundArguments = sig.bind(**kwargs)
+        except TypeError as e:
+            raise TypeError(
+                f'{e}\n'
+                f'Tried to instantiate/call {factory} with\n'
+                f'`{class_to_str(factory)}(**{kwargs})` '
+                f'in strict mode.\n'
+                f'Strict means ignore defaults from the signature.\n'
+                f'Signature: {sig}'
+            ) from e
+
+
+def config_to_instance(config, strict=False):
     """Is called by `Module.from_config()`. If possible, use that directly.
 
     Args:
         config:
+        strict:
+            If True, checks, that the instansiations doesn't use the default
+            values of the signature of the factory. That means, the config must
+            contains all arguments for the factory.
+
+            Usecase: While doing experiment, you add new arguments to your
+            factory and these don't reflect the old behaviour.
+            The strict arguments allows you to detect when you use an old
+            config that has to be adjusted.
 
     Returns:
 
+    >>> import torch.nn
+    >>> config = {
+    ...     'factory': 'torch.nn.modules.activation.ReLU',
+    ...     'inplace': False}
+    >>> config_to_instance(config)
+    ReLU()
+    >>> config_to_instance(config, strict=True)
+    ReLU()
+    >>> config = {
+    ...     'factory': 'torch.nn.modules.activation.ReLU'}
+    >>> config_to_instance(config)
+    ReLU()
+    >>> config_to_instance(config, strict=True)
+    Traceback (most recent call last):
+    ...
+    TypeError: missing a required argument: 'inplace'
+    Tried to instantiate/call <class 'torch.nn.modules.activation.ReLU'> with
+    `torch.nn.modules.activation.ReLU(**{})` in strict mode.
+    Strict means ignore defaults from the signature.
+    Signature: (inplace)
+    >>> config = {
+    ...     'factory': 'torch.nn.modules.activation.ReLU',
+    ...     'inplace_typo': False}
+    >>> config_to_instance(config)
+    Traceback (most recent call last):
+    ...
+    TypeError: got an unexpected keyword argument 'inplace_typo'
+    Tried to instantiate/call <class 'torch.nn.modules.activation.ReLU'> with
+    `torch.nn.modules.activation.ReLU(**{'inplace_typo': False})`.
+    Signature: (inplace=False)
+    >>> config_to_instance(config, strict=True)
+    Traceback (most recent call last):
+    ...
+    TypeError: got an unexpected keyword argument 'inplace_typo'
+    Tried to instantiate/call <class 'torch.nn.modules.activation.ReLU'> with
+    `torch.nn.modules.activation.ReLU(**{'inplace_typo': False})`.
+    Signature: (inplace=False)
+    >>> config = {
+    ...     'partial': 'torch.nn.modules.activation.ReLU',
+    ...     'inplace': False}
+    >>> config_to_instance(config)
+    functools.partial(<class 'torch.nn.modules.activation.ReLU'>, inplace=False)
+    >>> config_to_instance(config, strict=True)
+    functools.partial(<class 'torch.nn.modules.activation.ReLU'>, inplace=False)
+    >>> config = {
+    ...     'partial': 'torch.nn.modules.activation.ReLU'}
+    >>> config_to_instance(config)
+    <class 'torch.nn.modules.activation.ReLU'>
+    >>> config = {
+    ...     'partial': 'torch.nn.Linear'}
+    >>> config_to_instance(config)
+    <class 'torch.nn.modules.linear.Linear'>
     """
     if isinstance(config, dict):
-        if 'factory' in config:
-            factory, kwargs = _split_factory_kwargs(config)
-            new = import_class(factory)(
-                **config_to_instance(kwargs)
-            )
+        special_key = _get_special_key(config)
+        if special_key:
+            factory, kwargs = _split_factory_kwargs(config, key=special_key)
+            try:
+                factory = import_class(factory)
+            except TypeError as err:
+                raise TypeError(f'The special key {special_key} expects a '
+                                f'string or a callable but got',
+                                type(factory), factory) from err
+            kwargs = config_to_instance(kwargs, strict)
+
+            _check_factory_signature_and_kwargs(factory, kwargs,
+                                                strict, special_key)
+
+            if special_key == 'factory':
+                new = factory(**kwargs)
+            elif special_key == 'partial':
+                if len(kwargs) > 0:
+                    new = functools.partial(factory, **kwargs)
+                else:
+                    new = factory
+            else:
+                Exception('This cannot happen')
             try:
                 new.config = config
             except AttributeError:
@@ -838,11 +1141,11 @@ def config_to_instance(config):
         else:
             d = copy.copy(config)  # config.__class__() not possible in sacred>=0.8 because of ReadOnlyDict.
             for k, v in config.items():
-                d[k] = config_to_instance(v)
+                d[k] = config_to_instance(v, strict)
             return d
     elif isinstance(config, (tuple, list)):
         return config.__class__([
-            config_to_instance(l) for l in config
+            config_to_instance(l, strict) for l in config
         ])
     else:
         return config
@@ -1071,12 +1374,27 @@ class _DogmaticConfig:
         ... }), max_width=79-8)
         {'model': {'factory': torch.nn.modules.linear.Linear},
          'storage_dir': 'abc'}
+        >>> pprint(_DogmaticConfig.normalize({
+        ...     'model': {'partial': 'torch.nn.Linear'},
+        ...     'storage_dir': Path('abc')
+        ... }), max_width=79-8)
+        {'model': {'partial': torch.nn.modules.linear.Linear},
+         'storage_dir': 'abc'}
+        >>> pprint(_DogmaticConfig.normalize({
+        ...     'model': {'factory': 'torch.nn.Linear',
+        ...               'partial': 'torch.nn.Linear'},
+        ...     'storage_dir': Path('abc')
+        ... }), max_width=79-8)
+        {'model': {'factory': torch.nn.modules.linear.Linear,
+          'partial': 'torch.nn.Linear'},
+         'storage_dir': 'abc'}
         """
         if isinstance(dictionary, collections.Mapping):
-            if 'factory' in dictionary:
-                dictionary['factory'] = cls._force_factory_type(
-                    dictionary['factory']
-                )
+            special_key = _get_special_key(dictionary)
+            if special_key:
+                dictionary[special_key] = cls._force_factory_type(
+                    dictionary[special_key]
+                    )
             dictionary = {
                 k: cls.normalize(v)
                 for k, v in dictionary.items()
@@ -1121,13 +1439,17 @@ class _DogmaticConfig:
             mutable_idx=mutable_idx,
         )
 
-        if 'factory' in self.data:
+        if self.special_key:
             self._check_redundant_keys(
                 'padertorch.Configurable.get_config(updates=...) got an '
                 f'unexpected keyword argument in updates for '
-                f'{self.data["factory"]}.\n'
+                f'{self.data[self.special_key]}.\n'
                 'See details below.\n'
             )
+
+    @property
+    def special_key(self):
+        return _get_special_key(self.data)
 
     def get_sub_config(self, key, mutable_idx=None):
         if mutable_idx is None:
@@ -1142,12 +1464,12 @@ class _DogmaticConfig:
             raise KeyError(key)
 
     def _key_candidates(self):
-        if 'factory' in self.data:
-            factory = import_class(self.data['factory'])
+        if self.special_key:
+            factory = import_class(self.data[self.special_key])
             parameters = inspect.signature(factory).parameters.values()
             p: inspect.Parameter
 
-            parameter_names = tuple(['factory']) + tuple([
+            parameter_names = tuple([self.special_key]) + tuple([
                 p.name
                 for p in parameters
                 if p.kind in [
@@ -1172,9 +1494,9 @@ class _DogmaticConfig:
         return tuple(self.data.keys())
 
     def _check_redundant_keys(self, msg):
-        assert 'factory' in self.data
-        factory = import_class(self.data['factory'])
-        parameters = inspect.signature(factory).parameters.values()
+        assert self.special_key, f'Missing factory or partial in {self.data}'
+        imported = import_class(self.data[self.special_key])
+        parameters = inspect.signature(imported).parameters.values()
         p: inspect.Parameter
 
         if inspect.Parameter.VAR_KEYWORD in [p.kind for p in parameters]:
@@ -1187,7 +1509,7 @@ class _DogmaticConfig:
                     inspect.Parameter.POSITIONAL_OR_KEYWORD,
                     inspect.Parameter.KEYWORD_ONLY,
                 ]
-            ]) | {'factory'}
+            ]) | {self.special_key}
 
             redundant_keys = set(self.data.keys()) - parameter_names
 
@@ -1195,9 +1517,9 @@ class _DogmaticConfig:
                 from IPython.lib.pretty import pretty
                 raise Exception(
                     f'{msg}\n'
-                    f'Too many keywords for the factory {factory}.\n'
+                    f'Too many keywords for the factory {imported}.\n'
                     f'Redundant keys: {redundant_keys}\n'
-                    f'Signature: {inspect.signature(factory)}\n'
+                    f'Signature: {inspect.signature(imported)}\n'
                     f'Current config with fallbacks:\n{pretty(self.data)}'
                 )
 
@@ -1211,11 +1533,11 @@ class _DogmaticConfig:
     def __setitem__(self, key, value):
         self.data[key] = self.normalize(value)
 
-        if 'factory' in self.data.keys():
+        if self.special_key:
             self._check_redundant_keys(
                 'Tried to set an unexpected keyword argument for '
-                f'{self.data["factory"]} in finalize_dogmatic_config.\n'
-                'See details below and stacktrace above.\n'
+                f'{self.data[self.special_key]} in finalize_dogmatic_config.\n'
+                'See details below and stacktrace above.\n',
             )
 
     def update(self, dictionary: dict, **kwargs):
@@ -1235,10 +1557,10 @@ class _DogmaticConfig:
         return self[key]
 
     def _update_factory_kwargs(self):
-        assert 'factory' in self.data, self.data
+        assert self.special_key, f'Missing factory or partial in {self.data}'
 
         # Force factory to be the class/function
-        factory = import_class(self.data['factory'])
+        factory = import_class(self.data[self.special_key])
 
         # Freeze the mutable_idx (i.e. all updates to the config of
         # this level)
@@ -1299,9 +1621,8 @@ class _DogmaticConfig:
         finalize_dogmatic_config if it exists.)
 
         """
-        if 'factory' in self.data \
-                and key != 'factory' \
-                and self.data.mutable_idx != (len(self.data.maps) - 1):
+        if self.special_key and key != self.special_key \
+                    and self.data.mutable_idx != (len(self.data.maps) - 1):
             self._update_factory_kwargs()
 
         if 'cls' in self._key_candidates():
@@ -1334,32 +1655,39 @@ class _DogmaticConfig:
     def to_dict(self):
         """Export the Configurable object to a dict."""
         result_dict = {}
-        if 'factory' in self._key_candidates():
+        if self.special_key:
             self._update_factory_kwargs()
+
         for k in self._key_candidates():
             try:
                 v = self[k]
             except KeyError as ex:
                 from IPython.lib.pretty import pretty
-                if 'factory' in self._key_candidates() and k != 'factory':
+                if self.special_key == 'factory' \
+                        and self.special_key  in self._key_candidates() and \
+                        k != self.special_key:
                     # KeyError has a bad __repr__, use Exception
                     missing_keys = set(self._key_candidates()) - set(self.data.keys())
                     raise Exception(
                         f'KeyError: {k}\n'
-                        f'signature: {inspect.signature(self["factory"])}\n'
+                        f'signature: {inspect.signature(self[self.special_key])}\n'
                         f'missing keys: {missing_keys}\n'
                         f'self:\n{pretty(self)}'
                     ) from ex
+                elif self.special_key == 'partial' \
+                        and self.special_key in self._key_candidates() and \
+                        k != self.special_key:
+                    continue
                 else:
                     # KeyError has a bad __repr__, use Exception
                     # Can this happen?
                     raise Exception(
                         f'{k}\n'
-                        f'signature: {inspect.signature(self["factory"])}'
+                        f'signature: {inspect.signature(self[self.special_key])}'
                         f'self:\n{pretty(self)}'
                     ) from ex
 
-            if k == 'factory':
+            if self.special_key and k == self.special_key:
                 v = class_to_str(v)
             if isinstance(v, self.__class__):
                 v = v.to_dict()

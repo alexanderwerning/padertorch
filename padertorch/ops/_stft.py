@@ -1,12 +1,7 @@
 import numpy as np
 import torch
 from einops import rearrange
-from paderbox.transform.module_stft import _get_window
-from paderbox.transform.module_stft import _samples_to_stft_frames
-from paderbox.transform.module_stft import _stft_frames_to_samples
-from paderbox.transform.module_stft import sample_index_to_stft_frame_index
-from paderbox.transform.module_stft import _biorthogonal_window_fastest
-from scipy.signal.windows import blackman
+import paderbox as pb
 import typing
 from math import ceil
 
@@ -29,7 +24,8 @@ def get_stft_kernel(size, window):
 
 
 def get_istft_kernel(size, shift, window):
-    window = _biorthogonal_window_fastest(window, shift) / size
+    window = pb.transform.module_stft._biorthogonal_window_fastest(
+        window, shift) / size
     length = len(window)
     kernel_numpy = np.array([
         [np.cos(1 * f * 2 * np.pi / size * n) * window[n]
@@ -53,7 +49,7 @@ class STFT:
             size: int = 1024,
             shift: int = 256,
             *,
-            window: [str, typing.Callable] = blackman,
+            window: [str, typing.Callable] = 'blackman',
             window_length: int = None,
             fading: typing.Optional[typing.Union[bool, str]] = 'full',
             pad: bool = True,
@@ -79,11 +75,8 @@ class STFT:
                                 either complex, concat or stacked
                                 complex is not supported at the moment
         """
-        if complex_representation == 'complex':
-            raise NotImplementedError('Complex tensors are not yet implemented'
-                                      'in torch. This is just a placeholder'
-                                      'for later implementations')
-        self.possible_out_types = ['concat', 'stacked']
+
+        self.possible_out_types = ['concat', 'stacked', 'complex']
         assert complex_representation in self.possible_out_types, (
             f'Please choose one of the predefined output_types'
             f' {self.possible_out_types}, not {complex_representation}'
@@ -95,7 +88,7 @@ class STFT:
         self.window_length = window_length if window_length is not None \
             else size
 
-        window = _get_window(
+        window = pb.transform.module_stft._get_window(
             window=window,
             symmetric_window=symmetric_window,
             window_length=self.window_length,
@@ -124,9 +117,17 @@ class STFT:
         >>> stft_signal = np.concatenate(\
                 [np.real(stft_out), np.imag(stft_out)], axis=-1)
         >>> np.testing.assert_allclose(torch_stft_out, stft_signal, atol=1e-5)
+        >>> mixture = torch.rand((2, 6, 203))
+        >>> torch_stft = STFT(512, 20, window_length=40,\
+                              complex_representation='complex')
+        >>> torch_stft_out = torch_stft(mixture)
+        >>> torch_stft_out.shape
+        torch.Size([2, 6, 12, 257])
+        >>> from paderbox.transform import stft
+        >>> stft_out = stft(mixture.numpy(), 512, 20, window_length=40)
+        >>> np.testing.assert_allclose(torch_stft_out.numpy(), stft_out, atol=1e-5)
 
         """
-
         org_shape = inputs.shape
         stride = self.shift
         length = self.window_length
@@ -163,6 +164,8 @@ class STFT:
             encoded = torch.stack(encoded, dim=-1)
         elif self.complex_representation == 'concat':
             encoded = torch.cat(encoded, dim=-1)
+        elif self.complex_representation == 'complex':
+            encoded = torch.complex(*encoded)
         else:
             raise ValueError(
                 f'Please choose one of the predefined output_types'
@@ -195,31 +198,60 @@ class STFT:
         >>> complex_signal = signal_np[..., :257] + 1j* signal_np[..., 257:]
         >>> time_signal = istft(complex_signal, 512, 20, window_length=40)
         >>> np.testing.assert_allclose(torch_signal, time_signal, atol=1e-5)
+
+        >>> stft_signal = torch.rand((2, 4, 10, 257, 2))
+        >>> torch_stft = STFT(512, 20, window_length=40, \
+                              complex_representation='stacked')
+        >>> torch_signal = torch_stft.inverse(stft_signal)
+        >>> torch_signal.shape
+        torch.Size([2, 4, 180])
+        >>> from paderbox.transform import istft
+        >>> signal_np = stft_signal.numpy()
+        >>> complex_signal = signal_np[..., 0] + 1j* signal_np[..., 1]
+        >>> time_signal = istft(complex_signal, 512, 20, window_length=40)
+        >>> np.testing.assert_allclose(torch_signal, time_signal, atol=1e-5)
+
+        >>> stft_signal = torch.rand((2, 4, 10, 257), dtype=torch.complex128)
+        >>> torch_stft = STFT(512, 20, window_length=40, \
+                              complex_representation='complex')
+        >>> torch_signal = torch_stft.inverse(stft_signal)
+        >>> torch_signal.shape
+        torch.Size([2, 4, 180])
+        >>> from paderbox.transform import istft
+        >>> signal_np = stft_signal.numpy()
+        >>> time_signal = istft(signal_np, 512, 20, window_length=40)
+        >>> np.testing.assert_allclose(torch_signal, time_signal, atol=1e-5)
         """
 
-        org_shape = stft_signal.shape
-        x = stft_signal.view(-1, *org_shape[-2:])
-
-        x = rearrange(x, '... frames feat -> ... feat frames')
         if self.complex_representation == 'stacked':
-            signal_real, signal_imag = torch.chunk(stft_signal, 2, dim=-1)
+            signal_real, signal_imag = rearrange(stft_signal, '... s -> s ...')
         elif self.complex_representation == 'concat':
-            signal_real, signal_imag = torch.chunk(x, 2, dim=-2)
+            signal_real, signal_imag = torch.chunk(stft_signal, 2, dim=-1)
+        elif self.complex_representation == 'complex':
+            signal_real, signal_imag = stft_signal.real, stft_signal.imag
         else:
             raise ValueError(
                 f'Please choose one of the predefined output_types'
                 f'{self.possible_out_types} not {self.complex_representation}'
             )
-        signal_real = torch.cat(
-            [signal_real, signal_real[:, 1:-1].flip(1)], dim=1)
-        signal_imag = torch.cat(
-            [signal_imag, -signal_imag[:, 1:-1].flip(1)], dim=1)
-        kernel_real = self.istft_kernel_real.to(signal_real)
-        decoded_real = F.conv_transpose1d(signal_real, weight=kernel_real,
-                                          stride=self.shift)
-        kernel_imag = self.istft_kernel_imag.to(signal_imag)
-        decoded_imag = F.conv_transpose1d(signal_imag, kernel_imag,
-                                          stride=self.shift)
+        org_shape = signal_real.shape
+
+        def _apply_kernel(signal, kernel, reflect):
+            signal = signal.view(-1, *org_shape[-2:])
+            signal = rearrange(signal, '... frames feat -> ... feat frames')
+            if reflect:
+                signal = torch.cat([
+                    signal, -signal[:, 1:-1].flip(1)], dim=1)
+            else:
+                signal = torch.cat([
+                    signal, signal[:, 1:-1].flip(1)], dim=1)
+            return F.conv_transpose1d(signal, weight=kernel, stride=self.shift)
+
+        decoded_real = _apply_kernel(
+            signal_real, self.istft_kernel_real.to(signal_real), reflect=False)
+        decoded_imag = _apply_kernel(
+            signal_imag, self.istft_kernel_imag.to(signal_imag), reflect=True)
+
         time_signal = decoded_real + decoded_imag
         time_signal = time_signal.view(*org_shape[:-2], time_signal.shape[-1])
         if self.fading not in [None, False]:
@@ -241,7 +273,7 @@ class STFT:
             Number of STFT frames.
 
         """
-        return _samples_to_stft_frames(
+        return pb.transform.module_stft._samples_to_stft_frames(
             samples, self.window_length, self.shift,
             pad=self.pad, fading=self.fading
         )
@@ -256,7 +288,7 @@ class STFT:
         Returns:
 
         """
-        return sample_index_to_stft_frame_index(
+        return pb.transform.module_stft.sample_index_to_stft_frame_index(
             sample_index, self.window_length, self.shift, fading=self.fading
         )
 
@@ -270,6 +302,6 @@ class STFT:
         Returns: number of samples in time signal
 
         """
-        return _stft_frames_to_samples(
+        return pb.transform.module_stft._stft_frames_to_samples(
             frames, self.window_length, self.shift, fading=self.fading
         )

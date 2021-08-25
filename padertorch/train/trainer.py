@@ -2,6 +2,7 @@
     This module contains the Trainer class which can be used to train
     configurable padertorch models.
 """
+import sys
 import contextlib
 import itertools
 import time
@@ -15,7 +16,6 @@ import numpy as np
 import torch
 import torch.nn
 from torch.nn.parallel import gather, parallel_apply, replicate
-import tensorboardX
 import warnings
 
 from paderbox.utils.nested import deflatten
@@ -141,6 +141,8 @@ class Trainer(Configurable):
         ]
         self._stop_trigger = stop_trigger
         self._checkpoint_trigger = checkpoint_trigger
+
+        import tensorboardX  # The import is slow -> lazy import
         self.writer_cls = tensorboardX.SummaryWriter
 
     def test_run(
@@ -148,7 +150,11 @@ class Trainer(Configurable):
             train_iterator,
             validation_iterator,
             device=0 if torch.cuda.is_available() else 'cpu',
+            *,
             test_with_known_iterator_length=False,
+            temporary_directory=None,
+            deterministic_atol=1e-5,
+            deterministic_rtol=1e-5,
     ):
         """
         Run a test on the trainer instance (i.e. model test).
@@ -162,6 +168,20 @@ class Trainer(Configurable):
          - deterministic output in eval
          - simple review dict test
 
+        
+        Args:
+            train_iterator:
+            validation_iterator:
+            device:
+            test_with_known_iterator_length:
+            temporary_directory:
+                Specify a path as alternative to tempfile.TemporaryDirectory().
+                Note: This directory will not be deleted and it is expected that
+                it is empty.
+                Usecase: Fast debugging of the reports to tensorboard.
+                         After the test run you can start tensorboard and inspect
+                         the reported values.
+
         """
         test_run(
             self,
@@ -169,6 +189,9 @@ class Trainer(Configurable):
             validation_iterator,
             device=device,
             test_with_known_iterator_length=test_with_known_iterator_length,
+            temporary_directory=temporary_directory,
+            deterministic_atol=deterministic_atol,
+            deterministic_rtol=deterministic_rtol,
         )
 
     def train(
@@ -503,15 +526,30 @@ class Trainer(Configurable):
         return self.step(model, example, self.validate_timer, device)[1:]
 
     def step(self, model, example, timer, device):
-        # TODO: Backup OutOfMemory
-        with timer['time_per_to_device']:
-            example = model.example_to_device(example, device)
-        with timer['time_per_forward']:
-            model_out = model(example)
-        with timer['time_per_review']:
-            review = model.review(example, model_out)
-            loss, summary = self._review_to_loss_and_summary(review)
-            return loss, example, model_out, summary
+        try:
+            # TODO: Backup OutOfMemory
+            with timer['time_per_to_device']:
+                example = model.example_to_device(example, device)
+            with timer['time_per_forward']:
+                model_out = model(example)
+            with timer['time_per_review']:
+                review = model.review(example, model_out)
+                loss, summary = self._review_to_loss_and_summary(review)
+                return loss, example, model_out, summary
+        except Exception:
+            data = {
+                'model': self.model,
+                'state_dict': self.state_dict(),
+                'example': example,
+            }
+            if 'model_out' in locals():
+                data['model_out'] = model_out
+            if 'review' in locals():
+                data['review'] = review
+
+            log_path_pattern = self.log_error_state(data)
+            print(f'Wrote\n{log_path_pattern}\nfor debugging.')
+            raise
 
     def _review_to_loss_and_summary(self, review):
         """
@@ -575,6 +613,7 @@ class Trainer(Configurable):
             # not each object is serializable with `torch.save`.
             log_path_pattern = self.log_error_state({
                 'model': self.model,
+                'state_dict': self.state_dict(),
                 'review': review,
             })
             raise RuntimeError(
@@ -585,7 +624,7 @@ class Trainer(Configurable):
 
         return loss, review
 
-    def log_error_state(self, data_dict):
+    def log_error_state(self, data_dict, folder='log', file=sys.stdout):
         """
 
         Args:
@@ -595,19 +634,47 @@ class Trainer(Configurable):
             log_path_pattern that describes the successfully written files.
 
         """
+        import paderbox as pb
+
+        import pickle
+
+        class MyPickleModule:
+            __name__ = 'MyPickleModule'  # Pytorch tests if name is dill
+
+            class Pickler(pickle._Pickler):
+
+                def save(self, obj, save_persistent_id=True):
+                    try:
+                        super().save(obj, save_persistent_id=save_persistent_id)
+                    except Exception as e:
+                        print(f'Cannot pickle {obj!r}, replace it with a str.', file=file)
+                        super().save(repr(obj), save_persistent_id=save_persistent_id)
+
+            # Not sure, when this happens, but when `torch.save` uses
+            # `_legacy_save`, the MyPickleModule needs a dump function.
+            # Reported from TCL.
+            def dump(self, obj, file, protocol=None, *, fix_imports=True):
+                # copy from pickle source code
+                self.Pickler(file, protocol, fix_imports=fix_imports).dump(obj)
+
         written = []
         for k, v in data_dict.items():
-            p = self.storage_dir / 'log' / f'error_state_{k}.pth'
+            p = self.storage_dir / folder / f'error_state_{k}.pth'
             p.parent.mkdir(exist_ok=True)
             try:
                 # Not every object can be serialized.
-                torch.save(v, str(p))
+                with pb.io.atomic.open_atomic(p, 'wb') as fd:
+                    torch.save(v, fd, pickle_module=MyPickleModule())
                 written.append(k)
             except Exception as e:
-                print(f'Cannot save {k}. {e}')
+                import traceback
+                log_file = (self.storage_dir / folder / f'{k}.log')
+                with log_file.open('w') as fd:
+                    traceback.print_exc(file=fd)
+                print(f'Cannot save {k}. {type(e)}: {e}. See {log_file}', file=file)
 
         written = ','.join(written)
-        return str(self.storage_dir / 'log' / f'error_state_{{{written}}}.pth')
+        return str(self.storage_dir / folder / f'error_state_{{{written}}}.pth')
 
     def register_hook(self, hook):
         if isinstance(hook, (tuple, list)):
@@ -670,7 +737,9 @@ class Trainer(Configurable):
                 # not each object is serializable with `torch.save`.
                 log_path_pattern = self.log_error_state({
                     'model': self.model,
-                    'review': summary,
+                    'state_dict': self.state_dict(),
+                    'optimizer_summary': summary,
+                    'grad': {k: v.grad for k, v in self.model.named_parameters()},
                 })
                 raise RuntimeError(
                     f"The grad_norm ({grad_norm}) is not finite.\n"
