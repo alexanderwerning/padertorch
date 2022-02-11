@@ -1,3 +1,4 @@
+import sys
 import types
 import tempfile
 from pathlib import Path
@@ -86,6 +87,9 @@ class ProgresbarHookTest(unittest.TestCase):
 
 
 def test_summary_hook():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = Path(tmp_dir)
@@ -180,6 +184,10 @@ def test_summary_hook():
 
 
 def test_summary_hook_fail_duplicate_key():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
+
     hook = pt.train.hooks.SummaryHook((1, 'iteration'))
 
     hook.update_summary({
@@ -244,6 +252,9 @@ class DummyModel(pt.Model):
 
 
 def test_summary_hook_create_snapshot_flag():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
     class Model(DummyModel):
 
         def __init__(self, validation_losses, exp_dir, optimizer):
@@ -267,6 +278,9 @@ def test_summary_hook_create_snapshot_flag():
 
 
 def test_validation_hook_create_snapshot_flag():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
     class Model(DummyModel):
 
         def __init__(self, validation_losses, exp_dir, optimizer):
@@ -298,6 +312,9 @@ def test_validation_hook_create_snapshot_flag():
 
 
 def test_backoff():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
     ds = [0]
     with tempfile.TemporaryDirectory() as tmp_dir:
         optimizer = pt.optimizer.Adam()
@@ -326,6 +343,9 @@ def test_backoff():
 
 
 def test_loss_weight_annealing_hook():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
     class DummyTrainer:
         epoch = 0
         iteration = 0
@@ -345,6 +365,9 @@ def test_loss_weight_annealing_hook():
 
 
 def test_model_attribute_annealing_hook():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
 
     class DummyTrainer:
         epoch = 0
@@ -368,6 +391,9 @@ def test_model_attribute_annealing_hook():
 
 
 def test_lr_annealing_hook():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
 
     class DummyTrainer:
         epoch = 0
@@ -393,6 +419,9 @@ def test_lr_annealing_hook():
 
 
 def test_LRSchedulerHook():
+    if sys.platform.startswith('win'):
+        pytest.skip('this doctest does not work on Windows, '
+                    'training is not possible on Windows due to symlinks being unavailable')
     class DummyLRScheduler:
         def __init__(self):
             self.calls_iteration = []
