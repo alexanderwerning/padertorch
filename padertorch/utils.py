@@ -65,9 +65,9 @@ def to_list(x, length=None):
         x = to_list_helper(x)
     elif isinstance(x, str):
         x = to_list_helper(x)
-    elif isinstance(x, collections.Sequence):
+    elif isinstance(x, collections.abc.Sequence):
         pass
-    elif isinstance(x, collections.Iterable):
+    elif isinstance(x, collections.abc.Iterable):
         x = list(x)
     else:
         x = to_list_helper(x)
