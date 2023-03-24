@@ -285,6 +285,21 @@ class TimeWarpedSTFT:
         x = np.concatenate(x, axis=1)
         example["stft"] = np.stack([x.real, x.imag], axis=-1).astype(np.float32)
         num_frames = example["stft"].shape[1]
+        # ensure the output shape is equal to the output shape of the base_stft
+        # TODO: avoid padding here
+        assert self.base_stft.fading == "half", "Only fading=half is supported"  #TODO: support fading=full
+        expected_length = example["audio_data"].shape[-1] // self.base_stft.shift
+        #TODO: brittle code...
+        if num_frames != expected_length:
+            if num_frames < expected_length:
+                pad = len(example["stft"].shape) * [(0, 0)]
+                pad[-3] = (0, expected_length - num_frames)
+                example["stft"] = np.pad(example["stft"], pad, mode="constant")
+                assert num_frames - expected_length == -1, "Difference should not exceed 1"
+            else:
+                example["stft"] = example["stft"][..., :expected_length, :, :]
+                assert num_frames - expected_length == 1, "Difference should not exceed 1"
+            num_frames = example["stft"].shape[1]
         # print(num_frames, boundary_frame)
         if self.base_stft.alignment_keys is not None:
             self.base_stft.add_start_stop_frames(example)
