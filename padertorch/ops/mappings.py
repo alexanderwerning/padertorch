@@ -41,6 +41,7 @@ ACTIVATION_FN_MAP = _CallableDispatcher(
     sigmoid=torch.nn.Sigmoid,
     softmax=torch.nn.Softmax,  # Defaults to softmax along last dimension
     identity=torch.nn.Identity,
+    gelu=torch.nn.GELU,
 )
 
 
