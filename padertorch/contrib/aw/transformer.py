@@ -67,15 +67,17 @@ class TransformerEncoder(nn.Module):
             layer_dropout=0,
             forward=True,
             backward=True,
+            use_cls_token=False,
             rel_pos_bias_factory: Optional[RelativePositionalBiasFactory] = None,
             init_mode="default",
+            need_weights=False,
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.input_dim = input_dim if output_dim is not None else embed_dim
         self.output_dim = output_dim if output_dim is not None else embed_dim
         self.layer_dropout = layer_dropout
-        self.use_rel_pos_bias = rel_pos_bias_factory is not None
+        self.use_rel_pos_bias = bool(rel_pos_bias_factory)
         self.blocks = nn.ModuleList(
             [
                 block_factory(
@@ -102,10 +104,18 @@ class TransformerEncoder(nn.Module):
         assert forward or backward
         self.forward_attn = forward
         self.backward_attn = backward
+        self.use_cls_token = use_cls_token
+        if use_cls_token:
+            assert forward and backward, "Not implemented yet"
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.layer_norm = norm_layer(embed_dim)
-        self.apply_layernorm_before = self.blocks[0].style == "post-ln"
+        if len(self.blocks) > 0:
+            self.apply_layernorm_before = self.blocks[0].style == "post-ln"
+        else:
+            self.apply_layernorm_before = True
         if not self.apply_layernorm_before:
             assert self.blocks[0].style == "pre-ln"
+        self.need_weights = need_weights
         self.reset_parameters(init_mode=init_mode)
 
     # TODO: attention mask for sequence length
@@ -121,6 +131,9 @@ class TransformerEncoder(nn.Module):
                 seq_len, grid_size=grid_size).to(x.device)
         else:
             src_mask = None
+        
+        if self.use_cls_token:
+            x = torch.cat([self.cls_token.expand(x.shape[0], -1, -1), x], dim=1)
 
         if self.in_proj is not None:
             x = self.in_proj(x)
@@ -129,14 +142,16 @@ class TransformerEncoder(nn.Module):
             x = self.layer_norm(x)
 
         position_bias = None
+        attn_weights_list = []
         for blk in self.blocks:
             dropout_probability = np.random.random()
             if not self.training or (dropout_probability > self.layer_dropout):
                 if self.use_rel_pos_bias:
-                    x, position_bias = blk(
-                        x, attn_mask=src_mask, position_bias=position_bias)
+                    x, attn_weights, position_bias = blk(
+                        x, attn_mask=src_mask, position_bias=position_bias, need_weights=self.need_weights)
                 else:
-                    x = blk(x, attn_mask=src_mask)
+                    x, attn_weights = blk(x, attn_mask=src_mask, need_weights=self.need_weights)
+                attn_weights_list.append(attn_weights)
 
         if not self.apply_layernorm_before:
             x = self.layer_norm(x)
@@ -144,15 +159,18 @@ class TransformerEncoder(nn.Module):
         if self.out_proj is not None:
             x = self.out_proj(x)
 
-        return x, seq_len
+        if self.need_weights:
+            return x, seq_len, attn_weights_list
+        else:
+            return x, seq_len
 
     def reset_parameters(self, init_mode="default"):
         if init_mode == "deep_norm":
-            # block class should be post_LN
-            assert self.blocks[0].style == "post-ln"
-            deep_norm_alpha =  math.pow(2 * len(self.blocks), 1 / 4)
-            deep_norm_beta = math.pow(8 * len(self.blocks), -1 / 4)
             for blk in self.blocks:
+                # block class should be post_LN
+                blk.style == "post-ln"
+                deep_norm_alpha =  math.pow(2 * len(self.blocks), 1 / 4)
+                deep_norm_beta = math.pow(8 * len(self.blocks), -1 / 4)
                 blk.residual_scale = deep_norm_alpha
                 attn = blk.attn
                 mlp = blk.mlp

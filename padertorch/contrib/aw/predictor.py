@@ -16,7 +16,7 @@ class PredictorHead(Module):
                  *,
                  pooling_op="concat",
                  pooling_num_patches=None,
-                 apply_softmax=True,
+                 apply_softmax=False,
                  pool_axis=-3,
                  softmax_axis=-1):
         super().__init__()

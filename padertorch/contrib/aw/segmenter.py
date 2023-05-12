@@ -187,7 +187,7 @@ class TimeDomainViTSegmenter:
         for i, seg in enumerate(rearranged_segments):
             overwrite_keys = "example_id", "audio_data", "seq_len"
             new_example = {k: example[k] for k in example if k not in overwrite_keys}
-            new_example["example_id"] = f"{example['example_id']}_s{i}"
+            new_example["example_id"] = example['example_id']  # f"{example['example_id']}_s{i}" # breaks tuning
             new_example["audio_data"] = seg
             new_example["seq_len"] = seg.shape[-1]
             batch.append(new_example)

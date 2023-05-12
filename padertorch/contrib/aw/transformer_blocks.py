@@ -7,108 +7,8 @@ import math
 
 from padertorch.modules.fully_connected import fully_connected_stack
 
-# https://github.com/microsoft/unilm/blob/840b020ce5397c1c0dd9e62a2f4c66fba3afd934/beats/backbone.py
+from padertorch.contrib.aw.attention_bias import RelativePositionalBiasFactory
 
-
-class RelativePositionalBias(nn.Module):
-    def __init__(self, num_heads, q_head_dim, gated=False, num_buckets=320, max_distance=1280, gate_dim=8):
-        super().__init__()
-        self.num_buckets = num_buckets
-        self.max_distance = max_distance
-
-        self.num_heads = num_heads
-        self.q_head_dim = q_head_dim
-        self.relative_attention_bias = nn.Embedding(num_buckets, num_heads)
-        # only for gated option
-        if gated:
-            self.grep_linear = nn.Linear(q_head_dim, gate_dim)
-            self.grep_w = nn.Parameter(torch.ones(1, num_heads, 1, 1))
-        self.gated = gated
-        assert gate_dim % 2 == 0, "gate_dim must be even"
-        self.gate_dim = gate_dim
-
-    def _relative_positions_bucket(self, relative_positions, bidirectional=True):
-        num_buckets = self.num_buckets
-        max_distance = self.max_distance
-        relative_buckets = 0
-
-        if bidirectional:
-            num_buckets = num_buckets // 2
-            relative_buckets += (relative_positions >
-                                 0).to(torch.long) * num_buckets
-            relative_positions = torch.abs(relative_positions)
-        else:
-            relative_positions = - \
-                torch.min(relative_positions,
-                          torch.zeros_like(relative_positions))
-
-        max_exact = num_buckets // 2
-        is_small = relative_positions < max_exact
-
-        relative_postion_if_large = max_exact + (
-            torch.log(relative_positions.float() / max_exact)
-            / math.log(max_distance / max_exact)
-            * (num_buckets - max_exact)
-        ).to(torch.long)
-        relative_postion_if_large = torch.min(
-            relative_postion_if_large, torch.full_like(
-                relative_postion_if_large, num_buckets - 1)
-        )
-
-        relative_buckets += torch.where(is_small,
-                                        relative_positions, relative_postion_if_large)
-        return relative_buckets
-
-    # TODO: use unidirectional for masked transformer
-    def compute_bias(self, query_length, key_length):
-        context_position = torch.arange(
-            query_length, dtype=torch.long)[:, None]
-        memory_position = torch.arange(key_length, dtype=torch.long)[None, :]
-        relative_position = memory_position - context_position
-        relative_position_bucket = self._relative_positions_bucket(
-            relative_position,
-            bidirectional=True
-        )
-        relative_position_bucket = relative_position_bucket.to(
-            self.relative_attention_bias.weight.device)
-        values = self.relative_attention_bias(relative_position_bucket)
-        values = values.permute([2, 0, 1])
-        return values
-
-    def forward(self, q, position_bias=None):
-        # TODO: assumes source sequence length == target sequence length
-        # B, num_heads, N, C // num_heads
-        bsz, num_heads, seq_len, q_head_dim = q.size()
-        assert num_heads == self.num_heads, "num_heads must be equal to self.num_heads"
-        assert q_head_dim == self.q_head_dim, "q_head_dim must be equal to self.q_head_dim"
-
-        # setting up position_bias once per model forward pass
-        if position_bias is None:
-            position_bias = self.compute_bias(seq_len, seq_len)
-            position_bias = position_bias.unsqueeze(0).repeat(
-                bsz, 1, 1, 1).view(bsz * self.num_heads, seq_len, seq_len)
-
-        attn_mask_rel_pos = position_bias
-
-        if self.gated:
-            query_layer = q.view(bsz, self.num_heads, seq_len, self.q_head_dim)
-            _B, _H, _L, __ = query_layer.size()
-            gate_a, gate_b = torch.sigmoid(self.grep_linear(query_layer).view(
-                _B, _H, _L, 2, self.gate_dim//2).sum(-1, keepdim=False)).chunk(2, dim=-1)
-            # scale a*b, bias -(a+2) for w (self.grep_a)
-            gate_a_1 = gate_a * (gate_b * self.grep_w - 1.0) + 2.0
-            attn_mask_rel_pos = gate_a_1.view(
-                bsz * self.num_heads, seq_len, 1) * position_bias
-
-        return attn_mask_rel_pos, position_bias
-
-class RelativePositionalBiasFactory:
-    def __init__(self, **kwargs):
-        self.cls = RelativePositionalBias
-        self.kwargs = kwargs
-    
-    def __call__(self, *args, **kwargs):
-        return self.cls(*args, **{**kwargs, **self.kwargs})
 
 class TorchMultiHeadAttention(nn.Module):
     def __init__(self,
@@ -133,10 +33,13 @@ class TorchMultiHeadAttention(nn.Module):
         self.scale = (dim // num_heads)**-0.5
         assert rel_pos_bias_factory is False, "rel_pos_bias must be False for TorchMultiHeadAttention"
 
-    def forward(self, x, attn_mask=None, position_bias=None):
+    def forward(self, x, attn_mask=None, position_bias=None, need_weights=False):
         assert position_bias is None, "position_bias must be None for StandardMultiHeadAttention"
-        x, _ = self._attn(self.scale*x, x, x, attn_mask=attn_mask)
-        return x
+        x, attn_weights = self._attn(self.scale*x, x, x, attn_mask=attn_mask)
+        if need_weights:
+            return x, attn_weights
+        else:
+            return x, None
 
 # TODO: improve architecture, avoid passing position_bias around
 class MultiHeadSelfAttention(nn.Module):
@@ -181,9 +84,10 @@ class MultiHeadSelfAttention(nn.Module):
         self.in_proj_weight = self.qkv.weight
         self.out_proj = self.proj
 
-    def forward(self, x, attn_mask=None, position_bias=None):
+    def forward(self, x, attn_mask=None, position_bias=None, need_weights=False):
         B, N, C = x.shape
 
+        # TODO: solve this mess
         qkv_bias = None
         if self.q_bias is not None:
             if self.k_bias is not None:
@@ -213,12 +117,17 @@ class MultiHeadSelfAttention(nn.Module):
         q, k, v = qkv.unbind(0)
 
         q = q * self.scale  # TODO: this is not in-place, unlike before
-        alpha = 32  # TODO: what is this, taken from BEATs
+
+        # training stabilization for mixed precision training
+        # Noted in WavLM: D. Stabilization of Training
+        # exploits translation invariance of softmax 
+        alpha = 32
         q *= 1 / alpha
 
         # attn shape: B, num_heads, N, N
         attn = (q @ k.transpose(-2, -1))
 
+        # stabilize attention, see above
         attn = (attn - attn.max(dim=-1, keepdim=True)[0]) * alpha
 
         if attn_mask is not None:
@@ -237,10 +146,12 @@ class MultiHeadSelfAttention(nn.Module):
         x = self.proj(x)
         x = self.proj_dropout(x)
 
+        if not need_weights:
+            attn = None
         if self.rel_pos_bias:
-            return x, position_bias
+            return x, attn, position_bias
         else:
-            return x
+            return x, attn
 
 
 class AttentionBlock(nn.Module):
@@ -280,7 +191,7 @@ class AttentionBlock(nn.Module):
         attn_dropout=0.0,
         residual_scale=1.0,
         style="pre-ln",
-        rel_pos_bias_factory: Optional[RelativePositionalBias] = None,
+        rel_pos_bias_factory: Optional[RelativePositionalBiasFactory] = None,
         act_layer='gelu',
         norm_layer=nn.LayerNorm,
         attn=TorchMultiHeadAttention,
@@ -294,10 +205,10 @@ class AttentionBlock(nn.Module):
             dropout=dropout,
             attn_dropout=attn_dropout,
             proj_dropout=dropout,
-            rel_pos_bias_factory=rel_pos_bias_factory,
+            rel_pos_bias_factory=rel_pos_bias_factory
         )
 
-        self.use_rel_pos_bias = rel_pos_bias_factory is not None
+        self.use_rel_pos_bias = bool(rel_pos_bias_factory)
 
         self.norm2 = norm_layer(dim, eps=1e-6)
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -310,26 +221,26 @@ class AttentionBlock(nn.Module):
         self.residual_scale = residual_scale
         self.style = style
 
-    def pre_ln_forward(self, x, attn_mask=None, position_bias=None):
+    def pre_ln_forward(self, x, attn_mask=None, position_bias=None, need_weights=False):
         if self.use_rel_pos_bias:
-            x_attn, position_bias = self.attn(
-                self.norm1(x), attn_mask, position_bias)
+            x_attn, attn_weights, position_bias = self.attn(
+                self.norm1(x), attn_mask, position_bias, need_weights=need_weights)
         else:
-            x_attn = self.attn(self.norm1(x), attn_mask)
+            x_attn, attn_weights = self.attn(self.norm1(x), attn_mask, need_weights=need_weights)
 
         x = self.residual_scale*x + x_attn
         x = self.residual_scale*x + self.mlp(self.norm2(x))
 
         if self.use_rel_pos_bias:
-            return x, position_bias
+            return x, attn_weights, position_bias
         else:
-            return x
+            return x, attn_weights
 
-    def post_ln_forward(self, x, attn_mask=None, position_bias=None):
+    def post_ln_forward(self, x, attn_mask=None, position_bias=None, need_weights=False):
         if self.use_rel_pos_bias:
-            x_attn, position_bias = self.attn(x, attn_mask, position_bias)
+            x_attn, attn_weights, position_bias = self.attn(x, attn_mask, position_bias, need_weights=need_weights)
         else:
-            x_attn = self.attn(x, attn_mask)
+            x_attn, attn_weights = self.attn(x, attn_mask, need_weights=need_weights)
 
         x = self.residual_scale*x + x_attn
         x = self.norm1(x)
@@ -337,18 +248,85 @@ class AttentionBlock(nn.Module):
         x = self.norm2(x)
 
         if self.use_rel_pos_bias:
-            return x, position_bias
+            return x, attn_weights, position_bias
         else:
-            return x
+            return x, attn_weights
 
-    def forward(self, x, attn_mask=None, position_bias=None):
+    def forward(self, x, attn_mask=None, position_bias=None, need_weights=False):
         if self.style == "pre-ln":
-            return self.pre_ln_forward(x, attn_mask, position_bias)
+            return self.pre_ln_forward(x, attn_mask, position_bias, need_weights)
         elif self.style == "post-ln":
-            return self.post_ln_forward(x, attn_mask, position_bias)
+            return self.post_ln_forward(x, attn_mask, position_bias, need_weights)
         else:
             raise ValueError("Unknown style: {}".format(self.style))
 
+class ConformerAttention(nn.Module):
+    def __init__(
+        self,
+        dim,
+        num_heads=8,
+        mlp_ratio=4.0,
+        qkv_bias=True,
+        dropout=0.0,
+        attn_dropout=0.0,
+        expansion_factor=2,
+        kernel_size=32,
+        rel_pos_bias_factory: Optional[RelativePositionalBiasFactory] = None,
+        act_layer='gelu',
+        norm_layer=nn.LayerNorm,
+        attn=TorchMultiHeadAttention,
+    ):
+        super().__init__()
+        self.feed_forward1 = nn.Sequential(
+            norm_layer(dim, eps=1e-6),
+            nn.Linear(dim, mlp_ratio*dim),
+            nn.SiLU(),  # Swish
+            nn.Dropout(dropout),
+            nn.Linear(mlp_ratio*dim, dim),
+            nn.Dropout(dropout),
+        )
+
+        self.feed_forward2 = nn.Sequential(
+            norm_layer(dim, eps=1e-6),
+            nn.Linear(dim, mlp_ratio*dim),
+            nn.SiLU(),  # Swish
+            nn.Dropout(dropout),
+            nn.Linear(mlp_ratio*dim, dim),
+            nn.Dropout(dropout),
+        )
+
+        self.convolution_module = nn.Sequential(
+            norm_layer(dim, eps=1e-6),
+            nn.Conv1d(dim, expansion_factor*dim, kernel_size=1), # 2 x expansion factor
+            nn.GLU(),
+            nn.Conv1d(expansion_factor*dim, expansion_factor*dim, kernel_size=kernel_size, padding=1, groups=dim),  # depthwise convolution
+            nn.BatchNorm1d(dim),
+            nn.SiLU(),  # Swish
+            nn.Conv1d(expansion_factor*dim, dim, kernel_size=1),  # pointwise convolution
+            nn.Dropout(dropout),
+        )
+        self.attn_norm = norm_layer(dim, eps=1e-6)
+        self.final_norm = norm_layer(dim, eps=1e-6)
+        self.attn = attn(
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            dropout=dropout,
+            attn_dropout=attn_dropout,
+            proj_dropout=dropout,
+            rel_pos_bias_factory=rel_pos_bias_factory
+        )
+
+        assert bool(rel_pos_bias_factory)
+
+
+    def forward(self, x, attn_mask=None, position_bias=None, need_weights=False):
+        x = x + 0.5 * self.feed_forward1(x)
+        x = x + self.attn_dropout(self.attn(self.attn_norm(x), attn_mask, position_bias, need_weights=need_weights))
+        x = x + self.convolution_module(x)
+        x = x + 0.5 * self.feed_forward2(x)
+        x = self.final_norm(x)
+        return x, attn_weights, position_bias
 
 class AttentionBlockFactory:
     """Factory for AttentionBlock.
@@ -364,6 +342,12 @@ class AttentionBlockFactory:
             self.attn = TorchMultiHeadAttention
         elif implementation == "own":
             self.attn = MultiHeadSelfAttention
+        # elif implementation == "torch-cross":
+        #     self.attn = TorchCrossAttention
+        # elif implementation == "own-cross":
+        #     self.attn = MultiHeadCrossAttention
+        elif implementation == "conformer":
+            self.attn = ConformerAttention
         else:
             raise ValueError(
                 "Unknown attention block implementation: {}".format(implementation))
