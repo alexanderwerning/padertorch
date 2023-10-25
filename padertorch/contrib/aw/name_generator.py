@@ -1,3 +1,5 @@
+from paderbox.io.new_subdir import NameGenerator
+
 animal_names = ['monkey',
  'gorilla',
  'dog',
@@ -116,3 +118,5 @@ thing_names = ['bell',
  'pick',
  'pistol',
  'chains']
+
+default_name_generator = NameGenerator(lists=(animal_names, food_names, thing_names))
