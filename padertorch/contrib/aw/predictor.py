@@ -38,7 +38,7 @@ class PredictorHead(Module):
 
     def forward(self, batch):
         """batch: Bx...xFxD
-        we assume the frequency index for patches is given in  the second to last dimension here"""
+        we assume the frequency index for patches is given in the second to last dimension here"""
         pooled = self.pooling(batch)
         logits = self.classifier(pooled)
         probs = self.softmax(logits)
