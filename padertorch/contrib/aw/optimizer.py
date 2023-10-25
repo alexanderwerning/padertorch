@@ -30,9 +30,10 @@ class AdamW(Optimizer):
             weight_decay=weight_decay,
             amsgrad=amsgrad,
         )
+        self.weight_decay = weight_decay
 
     def param_groups_weight_decay(
-        self, model: nn.Module, weight_decay=1e-5, no_weight_decay_list=()
+        self, model: nn.Module, no_weight_decay_list=()
     ):
         """Adapted from [1].
 
@@ -56,7 +57,7 @@ class AdamW(Optimizer):
 
         self.parameters = [
             {"params": no_decay, "weight_decay": 0.0},
-            {"params": decay, "weight_decay": weight_decay},
+            {"params": decay, "weight_decay": self.weight_decay},
         ]
 
     def set_parameters(self, parameters):
@@ -74,9 +75,10 @@ class AdamW(Optimizer):
     def clip_grad(self):
         self.check_if_set()
         grad_clips = self.gradient_clipping
-        if isinstance(self.parameters, dict):
-            return torch.nn.utils.clip_grad_norm_(
-                [d["params"] for d in self.parameters], grad_clips
-            )
-        else:
-            return torch.nn.utils.clip_grad_norm_(self.parameters, grad_clips)
+        for p in self.parameters:
+            if isinstance(p, dict):
+                return torch.nn.utils.clip_grad_norm_(
+                    p["params"], grad_clips
+                )
+            else:
+                return torch.nn.utils.clip_grad_norm_(p, grad_clips)
