@@ -173,9 +173,9 @@ def test_run(
             lambda x: (exit_stack.enter_context(mock.patch.object(
                 x,
                 'step',
-                wraps=x.step,
+                wraps=x.optimizer.step,
                 new_callable=SpyMagicMock,
-            )) if x is not None else None), trainer.optimizer.optimizer)
+            )) if x is not None else None), trainer.optimizer)
 
         validate_mock = exit_stack.enter_context(mock.patch.object(
             trainer,
