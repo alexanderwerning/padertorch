@@ -58,7 +58,7 @@ class AudioReader:
 
         filepath = str(filepath)
         x, sr = soundfile.read(
-            filepath, start=start_sample, stop=stop_sample, always_2d=True
+            filepath, start=start_sample, stop=stop_sample, always_2d=True, dtype='float32'
         )
         if self.source_sample_rate is not None:
             assert sr == self.source_sample_rate, (self.source_sample_rate, sr)
