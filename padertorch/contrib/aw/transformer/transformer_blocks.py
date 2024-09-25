@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from typing import Optional
 import math
+from einops import einsum
 
 from padertorch.modules.fully_connected import fully_connected_stack
 
@@ -38,7 +39,7 @@ class TorchMultiHeadAttention(nn.Module):
         self.out_proj = self._attn.out_proj
         self.scale = (dim // num_heads) ** -0.5
         assert (
-            rel_pos_bias_factory is False
+            rel_pos_bias_factory is False or rel_pos_bias_factory is None
         ), "rel_pos_bias must be False for TorchMultiHeadAttention"
 
     def forward(self, x, attn_mask=None, position_bias=None, return_weights=False):
@@ -139,7 +140,8 @@ class MultiHeadSelfAttention(nn.Module):
         q *= 1 / alpha
 
         # attn shape: B, num_heads, N, N
-        attn = q @ k.transpose(-2, -1)
+        # attn = q @ k.transpose(-2, -1)
+        attn = einsum(q, k, "b h l d, b h m d -> b h l m")
 
         # stabilize attention, see above
         attn = (attn - attn.max(dim=-1, keepdim=True)[0]) * alpha
@@ -157,7 +159,8 @@ class MultiHeadSelfAttention(nn.Module):
         attn = attn.softmax(dim=-1)
         attn = self.attn_dropout(attn)
 
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        # x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = einsum(attn, v, "b h l m, b h m d -> b l h d").reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_dropout(x)
 
