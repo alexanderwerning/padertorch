@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 import functools
 import collections
+from typing import MutableSequence
 
 import numpy as np
 import torch
@@ -281,7 +282,7 @@ class Trainer(Configurable):
         # Change model to train mode (e.g. activate dropout)
         self.model.train()
 
-        if isinstance(device, (tuple, list)):
+        if isinstance(device, (MutableSequence, tuple, list)):
             assert all([isinstance(d, int) for d in device]), device
             # multiple devises e.g. [0, 1], [0, 1, 2, 3], ...
             # torch.nn.parallel.DataParallel moves everything to the first gpu.
@@ -559,8 +560,8 @@ class Trainer(Configurable):
             if 'review' in locals():
                 data['review'] = review
 
-            log_path_pattern = self.log_error_state(data)
-            print(f'Wrote\n{log_path_pattern}\nfor debugging.')
+            # log_path_pattern = self.log_error_state(data)
+            # print(f'Wrote\n{log_path_pattern}\nfor debugging.')
             raise
 
     def _review_to_loss_and_summary(self, review):
