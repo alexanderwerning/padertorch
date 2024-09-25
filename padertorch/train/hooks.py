@@ -20,6 +20,7 @@ from distutils.version import LooseVersion
 from natsort import natsorted
 from padertorch.train.trigger import IntervalTrigger, EndTrigger
 from tqdm.auto import tqdm
+from typing import MutableSequence
 
 
 tqdm.monitor_interval = 0
@@ -804,7 +805,7 @@ class ProgressBarHook(TriggeredHook):
         super().__init__((update_interval, 'iteration'))
         if isinstance(stop_trigger, EndTrigger):
             length, unit = stop_trigger.period, stop_trigger.unit
-        elif isinstance(stop_trigger, (tuple, list)):
+        elif isinstance(stop_trigger, (tuple, list, MutableSequence)):
             length, unit = stop_trigger
         else:
             raise ValueError(f'max_trigger is expected to be either a trigger '
