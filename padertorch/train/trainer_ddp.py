@@ -712,18 +712,17 @@ class Trainer(Configurable):
         Returns:
 
         """
-        if self.is_master:
-            self.register_hook(BackOffValidationHook(
-                trigger=self._checkpoint_trigger,
-                iterator=validation_iterator,
-                metric=metric,
-                maximize=maximize,
-                max_checkpoints=max_checkpoints,
-                n_back_off=n_back_off,
-                lr_update_factor=lr_update_factor,
-                back_off_patience=back_off_patience,
-                early_stopping_patience=early_stopping_patience,
-            ))
+        self.register_hook(BackOffValidationHook(
+            trigger=self._checkpoint_trigger,
+            iterator=validation_iterator,
+            metric=metric,
+            maximize=maximize,
+            max_checkpoints=max_checkpoints,
+            n_back_off=n_back_off,
+            lr_update_factor=lr_update_factor,
+            back_off_patience=back_off_patience,
+            early_stopping_patience=early_stopping_patience,
+        ))
 
     def clip_grad(self, summary: dict):
         # TODO: report clipped and unclipped
