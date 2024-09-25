@@ -60,9 +60,10 @@ from padertorch import Trainer
 from torch.cuda.amp import GradScaler
 
 class AutocastTrainer(Trainer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, autocast_enabled=True, **kwargs):
         super().__init__(*args, **kwargs)
         self.grad_scaler = GradScaler()
+        self.autocast_enabled = autocast_enabled
 
 
     def optimizer_step(self):
@@ -95,7 +96,7 @@ class AutocastTrainer(Trainer):
 
 
     def step(self, *args, **kwargs):
-        with autocast():
+        with autocast(enabled=self.autocast_enabled):
             loss, example, model_out, summary = super().step(*args, **kwargs)
             loss = self.grad_scaler.scale(loss)
             return loss, example, model_out, summary
