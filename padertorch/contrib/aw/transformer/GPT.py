@@ -9,6 +9,45 @@ from typing import Optional, List
 import torch
 
 
+class SamplingStrategy(dict):
+    def __init__(self, strategy="greedy", generator=None, **kwargs):
+        self.strategy = strategy
+        self.generator = generator
+        self.update(**kwargs)
+
+    def __call__(self, probs: "1D tensor of probabilities"):
+        if self.strategy == "greedy":
+            return torch.argmax(probs, dim=-1)
+        elif self.strategy == "nucleus":
+            self.nucleus_p = self.get("nucleus_p", 0.9)
+            # find highest prob logits that sum to p
+            sorted_probs, sorted_indices = torch.sort(probs, descending=True, dim=-1)
+            cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+            sorted_indices_to_remove = cumulative_probs > self.nucleus_p
+            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[
+                ..., :-1
+            ].clone()
+            sorted_indices_to_remove[..., 0] = 0
+            indices_to_remove = sorted_indices[sorted_indices_to_remove]
+            probs[indices_to_remove] = 0
+            return torch.multinomial(probs, num_samples=1, generator=self.generator)
+        elif self.strategy == "beam":
+            raise NotImplementedError
+        elif self.strategy == "top_k":
+            self.k = self.get("k", 3)
+            top_k_values, top_k_indices = probs.topk(self.k)
+            return top_k_indices[
+                torch.multinomial(
+                    top_k_values / top_k_values.sum(),
+                    num_samples=1,
+                    generator=self.generator,
+                )[0]
+            ]
+
+        else:
+            raise NotImplementedError
+
+
 @dataclasses.dataclass
 class GPT_Config(dict):
     layers: int = 12
@@ -19,6 +58,9 @@ class GPT_Config(dict):
     attention_type: str = "torch"
     tokenizer: str = "gpt2"
     context_size: int = 512
+    sampling: dict = dataclasses.field(
+        default_factory=lambda: dict(strategy="nucleus", nucleus_p=0.9)
+    )
 
     def update(self, config):
         assert isinstance(config, dict)
@@ -62,7 +104,6 @@ def get_gpt_config(config_name):
 def perplexity(logits, targets):
     # logits: (batch, sequence, vocabulary)
     # targets: (batch, sequence) # token indices
-    # breakpoint()
     conditional_logits = F.softmax(logits[0], dim=-1)[:, targets[0]]
     ppl = (-conditional_logits.log().mean()).exp()
     return ppl
@@ -86,7 +127,9 @@ class Model(pt.Model):
             assert isinstance(config, GPT_Config)
             self.cfg = config
 
-        self.tokenizer = GPT2TokenizerFast.from_pretrained(self.cfg.tokenizer)
+        self.tokenizer = GPT2TokenizerFast.from_pretrained(
+            self.cfg.tokenizer, force_download=False
+        )
         self.transformer_decoder = TransformerDecoder(
             embed_dim=self.cfg.dimension,
             depth=self.cfg.layers,
@@ -109,6 +152,7 @@ class Model(pt.Model):
             self.cfg.context_size, self.cfg.dimension
         )
         self._device_proxy = torch.nn.Parameter(torch.zeros(1))
+        self._no_loss_id = -100
         self.reset_weights()
 
     def reset_weights(self):
@@ -117,7 +161,7 @@ class Model(pt.Model):
         # )
         # self.positional_encoding.weight.data[:, ::2] = torch.sin(frequency)
         # self.positional_encoding.weight.data[:, 1::2] = torch.cos(frequency)
-        self.transformer_decoder.out_proj.bias.data[:] = 1/self.cfg.vocabulary_size
+        self.transformer_decoder.out_proj.bias.data[:] = 1 / self.cfg.vocabulary_size
         torch.nn.init.normal_(self.embedding.weight, mean=0.0, std=0.02)
         torch.nn.init.normal_(self.positional_encoding.weight, mean=0.0, std=0.02)
 
@@ -132,34 +176,48 @@ class Model(pt.Model):
     def _forward(self, batch_tokens: torch.Tensor):
         # batched and padded input
         # embed tokens
+        # TODO: find more elegant way to handle pad tokens
+        padding = batch_tokens==self._no_loss_id
+        batch_tokens[padding] = 0
         x = self.embedding(batch_tokens)
+        x[padding] = 0
         # positional encoding
         seq_len = min(self.cfg.context_size, x.shape[1])
-        x = x[:, :seq_len] + self.positional_encoding.weight[: seq_len]
+        x = x[:, :seq_len] + self.positional_encoding.weight[:seq_len]
         # apply transformer decoder + head
         logits, _seq_len = self.transformer_decoder(x)
         probs = F.softmax(logits, dim=-1)
         return probs, logits
 
     def forward(self, batch: List[str]):
-        token_ids = self.tokenizer(batch, return_tensors="pt")["input_ids"]
-        # padded?
-        token_ids = torch.as_tensor(token_ids, device=self.device).detach()
+        token_ids = self.tokenizer(batch)["input_ids"]
+        # pad if necessary:
+        max_len = max(len(t) for t in token_ids)
+        token_ids = torch.as_tensor(
+            [
+                [t[i] if i<len(t) else self._no_loss_id for i in range(max_len)]
+                for t in token_ids
+            ],
+            device=self.device,
+        ).detach()
         probs, logits = self._forward(token_ids)
         return probs, logits, token_ids
 
+    # TODO: add loss masking
     def review(self, batch, output):
         probs, logits, token_ids = output
         # causal language modeling
-        targets = token_ids[: , :self.cfg.context_size]
+        targets = token_ids[:, : self.cfg.context_size]
         predicted_logits = logits[:, :-1]
         actual_targets = targets[:, 1:].detach()
         # do not compute loss for padded values
         loss = F.cross_entropy(
-            predicted_logits.view(-1, self.cfg.vocabulary_size), actual_targets.view(-1)
-        )  # , ignore_index=self.tokenizer.pad_token_id)
+            predicted_logits.reshape(-1, self.cfg.vocabulary_size),
+            actual_targets.reshape(-1),
+            ignore_index=self._no_loss_id,
+        )
         summary = dict(loss=loss)
-        summary["texts"] = {f"dataset_text_0": str(batch)}
+        summary["texts"] = {f"dataset_text_0": str(batch[0]) if isinstance(batch, list) else str(batch)}
         with torch.no_grad():
             ppl = perplexity(predicted_logits.cpu(), actual_targets.cpu())
             summary["scalars"] = {"perplexity": ppl}
@@ -169,41 +227,43 @@ class Model(pt.Model):
     def modify_summary(self, summary):
         summary = super().modify_summary(summary)
         # add sampled text to summary
-        start_text = "The"
+        start_text = "Once"
         num_gens = 3
         for i in range(num_gens):
-            summary["texts"][f"sampled_text_{i}"] = self.generate(start_text, do_sample=True, sample_k=3)
+            summary["texts"][f"sampled_text_{i}"] = self.generate(start_text, seed=i)
         return summary
 
     @torch.no_grad()
     def generate(
-        self, start_text, num_tokens=100, do_sample=False, sample_seed=1, sample_k=None
+        self,
+        start_text,
+        num_tokens=100,
+        return_tokens=False,
+        add_special_tokens=True,
+        seed=0,
     ):
+        sampling_strategy = SamplingStrategy(
+            **self.cfg.sampling,
+            generator=torch.Generator(device=self.device).manual_seed(seed),
+        )
         tokens = self.tokenizer(start_text)["input_ids"]
+        if add_special_tokens:
+            tokens = [self.tokenizer.bos_token_id] + tokens
         for _ in range(num_tokens):
             probs, _ = self._forward(torch.tensor([tokens], device=self.device))
-            if do_sample:
-                gen = torch.Generator(device=self.device)
-                gen.manual_seed(sample_seed)
-                if sample_k == None:
-                    next_token = torch.multinomial(probs[0, -1, :], num_samples=1, generator=gen)[0]
-                else:
-                    top_k_values, top_k_indices = probs[0 , -1, :].topk(sample_k)
-                    next_token = top_k_indices[
-                        torch.multinomial(top_k_values/top_k_values.sum(), num_samples=1, generator=gen)[0]
-                    ]
-            else:
-                next_token = torch.argmax(probs[:, -1, :])
+            next_token = sampling_strategy(probs[0, -1, :])
             tokens.append(next_token.item())
-        return self.tokenizer.decode(tokens)
-    
+        text = self.tokenizer.decode(tokens)
+        if return_tokens:
+            return text, tokens
+        return text
 
     @classmethod
     def from_pretrained(cls, config, path):
         model = cls(config)
         ckpt = torch.load(path)
         if "optimizer" in ckpt:
-            weights = ckpt['model']
+            weights = ckpt["model"]
         else:
             weights = ckpt
         model.load_state_dict(weights)
